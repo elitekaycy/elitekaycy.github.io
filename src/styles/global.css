@@ -47,6 +47,27 @@
   --accent: #1d4ed8;
   --accent-hover: #1e40af;
   --accent-fg: #ffffff;
+
+  /* Semantic inks, shared with the book's figures so prose and diagrams mean
+     the same thing by the same colour: blue = market data, green = engine and
+     favourable, amber = risk and supervision, red = loss and halt, purple =
+     broker and venue. Contrast on --bg #ffffff:
+       --ink-risk    #92400e →  7.5:1
+       --ink-halt    #b91c1c →  5.9:1
+       --ink-gain    #15803d →  4.9:1
+       --ink-venue   #6d28d9 →  6.6:1
+     Colour never carries meaning alone — every use is paired with a word,
+     a sign, or a label (WCAG 1.4.1). */
+  --ink-risk: #92400e;
+  --ink-halt: #b91c1c;
+  --ink-gain: #15803d;
+  --ink-venue: #6d28d9;
+  --wash-risk: #fffbeb;
+  --wash-halt: #fef2f2;
+  --wash-gain: #f0fdf4;
+  --wash-note: #f8fafc;
+  --mark-bg: #fff3cd;
+  --mark-fg: #713f12;
   color-scheme: light;
 }
 
@@ -67,6 +88,24 @@
   --accent: #7aa7ff;
   --accent-hover: #a5c3ff;
   --accent-fg: #0a0a0b;
+
+  /* Same roles, raised in lightness and slightly boosted in chroma: a dark
+     ground desaturates colour perceptually, so the light-mode hexes read
+     muddy if reused directly. Contrast on --bg #0a0a0b:
+       --ink-risk    #fbbf24 → 12.6:1
+       --ink-halt    #f87171 →  7.4:1
+       --ink-gain    #4ade80 → 10.9:1
+       --ink-venue   #c4b5fd → 10.2:1 */
+  --ink-risk: #fbbf24;
+  --ink-halt: #f87171;
+  --ink-gain: #4ade80;
+  --ink-venue: #c4b5fd;
+  --wash-risk: rgb(251 191 36 / 0.09);
+  --wash-halt: rgb(248 113 113 / 0.09);
+  --wash-gain: rgb(74 222 128 / 0.08);
+  --wash-note: rgb(255 255 255 / 0.04);
+  --mark-bg: rgb(251 191 36 / 0.18);
+  --mark-fg: #ffd876;
   color-scheme: dark;
 }
 
@@ -83,6 +122,17 @@
     --accent: #7aa7ff;
     --accent-hover: #a5c3ff;
     --accent-fg: #0a0a0b;
+    /* Mirrors the explicit dark block above — see there for contrast notes. */
+    --ink-risk: #fbbf24;
+    --ink-halt: #f87171;
+    --ink-gain: #4ade80;
+    --ink-venue: #c4b5fd;
+    --wash-risk: rgb(251 191 36 / 0.09);
+    --wash-halt: rgb(248 113 113 / 0.09);
+    --wash-gain: rgb(74 222 128 / 0.08);
+    --wash-note: rgb(255 255 255 / 0.04);
+    --mark-bg: rgb(251 191 36 / 0.18);
+    --mark-fg: #ffd876;
     color-scheme: dark;
   }
 }
@@ -339,6 +389,92 @@ body {
   width: 100%;
   background: #fff;
   padding: 0.75rem;
+  cursor: zoom-in;
+}
+
+/* Figure lightbox. The diagrams are 1600px wide and the reading column is
+   less than half that, so detail is legible only at full size. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.75rem, 3vw, 2.5rem);
+  background: color-mix(in srgb, var(--bg) 88%, #000);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.lightbox[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lightbox__frame {
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+}
+
+.lightbox__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  padding: 1rem;
+  cursor: zoom-in;
+}
+
+/* Actual size: let the frame scroll rather than shrinking the figure. */
+.lightbox[data-zoomed] .lightbox__img {
+  max-width: none;
+  cursor: zoom-out;
+}
+
+.lightbox__caption {
+  position: absolute;
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(70ch, 92vw);
+  text-align: center;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--bg);
+  color: var(--muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lightbox__close:hover {
+  color: var(--fg);
+  border-color: var(--border-strong, var(--border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox {
+    transition: none;
+  }
 }
 
 /* Markdown emits the caption as its own paragraph right after the figure;
@@ -359,6 +495,92 @@ body {
 .prose :where(hr) {
   margin: 3rem 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Reading layer
+   Numbers, emphasis and callouts. The governing rule is that colour is a
+   scarce resource: prose carries at most two or three semantic inks before
+   hierarchy collapses, so hue is reserved for things that are genuinely
+   instances of a category (a risk, a loss) and never used for plain emphasis.
+--------------------------------------------------------------------------- */
+
+/* Figures in running prose read as data rather than words, and columns of
+   them line up. This is typographic, not chromatic — tinting every number
+   would spend the amber that already means "risk" on the least meaningful
+   distinction on the page. */
+.prose {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Entry point: the first paragraph of a chapter is set slightly larger so the
+   eye has somewhere obvious to start before scanning takes over. */
+.prose > p:first-of-type {
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: var(--fg);
+}
+
+/* A quoted claim is a landmark in a long read — the two in this series carry
+   the book's central requirement, so they are set to be found while skimming. */
+.prose :where(blockquote) {
+  font-size: 1.0625rem;
+}
+
+.prose :where(blockquote strong) {
+  color: var(--accent);
+}
+
+/* Highlight. Rare by design — more than about one per screenful and it stops
+   meaning anything. Translucent in dark mode: a solid yellow fill on a
+   near-black ground glares. */
+.prose :where(mark) {
+  background: var(--mark-bg);
+  color: var(--mark-fg);
+  padding: 0.05em 0.25em;
+  border-radius: 0.25rem;
+}
+
+/* Signed money. Colour here reuses the figures' own meaning (green
+   favourable, red adverse) and is always accompanied by the sign or the word,
+   so the meaning survives greyscale and colour-blindness. */
+.prose .gain { color: var(--ink-gain); font-weight: 500; }
+.prose .loss { color: var(--ink-halt); font-weight: 500; }
+
+/* Callouts. Four kinds, each borrowing a colour the figures already use, so a
+   warning in the prose is the same amber as a warning in a diagram. Left rule
+   plus a low-opacity wash rather than a saturated fill — a solid block reads
+   as a warning label and trains readers to skip it by the third one. */
+.prose .callout {
+  margin: 1.75rem 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: var(--wash-note);
+}
+
+.prose .callout > :first-child { margin-top: 0; }
+.prose .callout > :last-child { margin-bottom: 0; }
+
+.prose .callout__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.prose .callout--note { border-color: var(--border-strong); background: var(--wash-note); }
+.prose .callout--note .callout__label { color: var(--muted); }
+
+.prose .callout--tip { border-color: var(--ink-gain); background: var(--wash-gain); }
+.prose .callout--tip .callout__label { color: var(--ink-gain); }
+
+.prose .callout--warning { border-color: var(--ink-risk); background: var(--wash-risk); }
+.prose .callout--warning .callout__label { color: var(--ink-risk); }
+
+.prose .callout--danger { border-color: var(--ink-halt); background: var(--wash-halt); }
+.prose .callout--danger .callout__label { color: var(--ink-halt); }
 
 /* Shiki emits both themes; show the one matching the active theme. */
 :root[data-theme="dark"] .astro-code,

@@ -22,6 +22,29 @@ parts:
       - chapter-09-backtest-reporting
       - chapter-10-parameter-sweeps-and-walk-forward-analysis
       - chapter-11-backtest-fidelity
+  - title: "The DSL"
+    chapters:
+      - chapter-12-why-a-dsl
+      - chapter-13-parsing-and-compiling
+      - chapter-14-indicators
+  - title: "Data"
+    chapters:
+      - chapter-15-historical-data
+  - title: "Going Live"
+    chapters:
+      - chapter-16-the-live-runtime
+      - chapter-17-brokers
+      - chapter-18-the-order-lifecycle
+      - chapter-19-resilience
+      - chapter-20-backtest-live-parity
+  - title: "Portfolios and Operations"
+    chapters:
+      - chapter-21-portfolios
+      - chapter-22-observability
+      - chapter-23-performance
+  - title: "Close"
+    chapters:
+      - chapter-24-what-this-teaches
 ---
 
 A chapter-by-chapter walkthrough of trading systems in general, and `qkt` — an
