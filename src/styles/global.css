@@ -328,6 +328,34 @@ body {
   border: 1px solid var(--border);
 }
 
+/* Book figures.
+   The diagrams are rendered on white on purpose — their palette is semantic
+   (blue is market data, amber is risk, red is a halt), so they can't be
+   recoloured per theme without the colours losing their meaning. Framing them
+   as a paper plate makes that read as deliberate in dark mode instead of as a
+   bright rectangle dropped on the page. */
+.prose :where(img[src^="/diagrams/"]) {
+  display: block;
+  width: 100%;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+/* Markdown emits the caption as its own paragraph right after the figure;
+   tie the two together and set the caption back from the body text. */
+.prose p:has(> img[src^="/diagrams/"]) {
+  margin-bottom: 0.6rem;
+}
+
+.prose p:has(> img[src^="/diagrams/"]) + p {
+  margin-top: 0;
+  text-align: center;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
 .prose :where(hr) {
   margin: 3rem 0;
 }

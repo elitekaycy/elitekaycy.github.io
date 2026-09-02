@@ -1,6 +1,6 @@
 ---
 title: "Exact Arithmetic"
-excerpt: "Every number this book has discussed so far — a fill price, a position's quantity, a realized gain, an account's equity — is, underneath, just a number stored in a computer's memory. And there is a genuinely dangerous..."
+excerpt: "Every number this book has discussed so far — a fill price, a position's quantity, a realized gain, an account's equity — is, underneath, just a number stored in a computer's memory. And there is a..."
 date: 2026-07-13
 order: 7
 draft: false
@@ -16,7 +16,9 @@ For most software, that sliver of error is irrelevant — a rendering coordinate
 
 ## Two different kinds of "how precise," for two different jobs
 
-`BigDecimal` being *exact* doesn't mean every operation on it is automatically well-defined. Addition, subtraction, and multiplication of two exact decimals always produce another exact decimal — no ambiguity there. Division is different, and this is worth understanding as its own software concept: dividing two exact decimals doesn't always produce a *terminating* decimal. `1 ÷ 3` is exactly `0.333...`, forever — there's no finite decimal that equals it exactly. Ask `BigDecimal` to divide without telling it how to handle that, and it doesn't guess; it throws an exception, because silently picking an arbitrary cutoff would be exactly the kind of hidden imprecision this whole design exists to avoid. You are required to say, at the moment of dividing, how much precision you actually want.
+Switching to an exact decimal type sounds like the end of the story. It isn't, and the place it stops being enough is worth seeing, because it's the first thing anyone hits.
+
+Being *exact* doesn't mean every operation is automatically well-defined. Addition, subtraction, and multiplication of two exact decimals always produce another exact decimal — no ambiguity there. Division is different, and this is worth understanding as its own software concept: dividing two exact decimals doesn't always produce a *terminating* decimal. `1 ÷ 3` is exactly `0.333...`, forever — there's no finite decimal that equals it exactly. Ask `BigDecimal` to divide without telling it how to handle that, and it doesn't guess; it throws an exception, because silently picking an arbitrary cutoff would be exactly the kind of hidden imprecision this whole design exists to avoid. You are required to say, at the moment of dividing, how much precision you actually want.
 
 qkt keeps one small, central object that answers that question consistently everywhere:
 
@@ -32,7 +34,9 @@ These are two genuinely different tools, for two different moments. `SCALE` + `R
 
 ## Why round to even, not round up
 
-`ROUNDING` is set to `HALF_EVEN` — "banker's rounding" — not the `HALF_UP` rule most people are taught in school, where `0.5` always rounds up. That choice isn't arbitrary. `HALF_UP` sounds harmless for any one number, but apply it across millions of genuinely-tied roundings — and a system processing this many trades will hit exact ties constantly — and it introduces a small, *systematic* bias: every tie nudges the aggregate slightly upward, in the same direction, forever. `HALF_EVEN` instead rounds a tie to whichever neighbor is even, which means across a large population of ties, roughly half round up and half round down. The two rules look identical on any single number and behave completely differently in aggregate — which is exactly the property that matters for a system whose output gets summed, over and over, into an account balance. This is the same reason real accounting and financial systems use `HALF_EVEN` rather than the rule taught for everyday arithmetic.
+We all learned one rounding rule in school, and we all learned the same one: when it lands exactly on a half, round up. 2.5 becomes 3. It's simple, it's symmetric-looking, and it is quietly the wrong rule for money.
+
+qkt rounds ties to whichever neighbour is *even* — 2.5 becomes 2, 3.5 becomes 4. That's "banker's rounding," `HALF_EVEN`, and the choice isn't arbitrary. `HALF_UP` sounds harmless for any one number, but apply it across millions of genuinely-tied roundings — and a system processing this many trades will hit exact ties constantly — and it introduces a small, *systematic* bias: every tie nudges the aggregate slightly upward, in the same direction, forever. `HALF_EVEN` instead rounds a tie to whichever neighbor is even, which means across a large population of ties, roughly half round up and half round down. The two rules look identical on any single number and behave completely differently in aggregate — which is exactly the property that matters for a system whose output gets summed, over and over, into an account balance. This is the same reason real accounting and financial systems use `HALF_EVEN` rather than the rule taught for everyday arithmetic.
 
 ## Round once, at the boundary — never in the middle
 
@@ -53,22 +57,8 @@ That rate then multiplies straight through the conversion with no rounding in be
 val scaledNative = native.amount.setScale(Money.SCALE, Money.ROUNDING)
 ```
 
-```
-   nativeAmount (exact — e.g. realized P&L × contract size, unrounded)
-          │
-          ▼
-   FX rate computed at full precision
-   BigDecimal.ONE.divide(price, Money.CONTEXT)   ← 16 significant digits,
-          │                                          not yet forced to 8 places
-          ▼
-   nativeAmount × rate               ← still full precision, no setScale here
-          │
-          ▼
-   ⚑  ONE  setScale(Money.SCALE, Money.ROUNDING)  ⚑   ← the only rounding
-          │                                              this value ever sees
-          ▼
-   stored / reported / compared
-```
+![Five steps from an exact native amount to a stored, reported figure, with exactly one setScale at the very end](/diagrams/chapter-07/round-once-at-the-boundary.png)
+*Figure 7.1 — Full precision survives every intermediate step. `setScale` — the only place this value is ever rounded — happens once, at step 4, right before the number leaves the system.*
 
 The same shape appears wherever qkt averages an entry price across several fills: total notional divided by total quantity at full `CONTEXT` precision, and only the resulting average gets `setScale`d once, on the way out. One rounding, at the edge — not one every time a number changes hands internally.
 
@@ -90,32 +80,8 @@ fun roundPrice(p: BigDecimal?): BigDecimal? = p?.setScale(digits, RoundingMode.H
 
 Notice the two rounding modes are deliberately different, and the difference is the whole point. Volume rounds **down**, never `HALF_EVEN` — because size has a genuine "safe direction." Rounding a requested size *up* would silently hand the strategy more risk than it asked for; rounding down at worst slightly under-fills the request, which is always the safer failure. Price has no such safe direction — a price can legitimately need to move either up or down to land on the venue's grid, so the unbiased `HALF_EVEN` rule from earlier applies there too. The rounding rule isn't chosen once for the whole system; it's chosen per quantity, based on what rounding in the wrong direction would actually cost:
 
-```
-                raw order (strategy-computed volume, price)
-                              │
-                              ▼
-              volume ÷ volumeStep, ROUND DOWN, × volumeStep
-                (never UP — that would silently submit
-                 more size than the strategy requested)
-                              │
-                 ┌────────────┴────────────┐
-                 ▼                          ▼
-        quantized < volumeMin       quantized within [min, max]
-                 │                          │
-                 ▼                          ▼
-              REJECT                 round price to venue `digits`,
-       "below venue volumeMin"       HALF_EVEN (no safe direction
-                                      for a price, so unbiased)
-                                             │
-                                  ┌──────────┴──────────┐
-                                  ▼                      ▼
-                     within tradeStopsLevel      clear of the stops level
-                     of the current price                │
-                                  │                       ▼
-                                  ▼                  Ok(quantized wire)
-                              REJECT                  → sent to the venue
-                       "inside stops level"
-```
+![A raw order quantized down to the venue's volume step, then its price rounded to the venue's tick grid, rejecting at two different checkpoints along the way](/diagrams/chapter-07/quantize-to-the-venue-grid.png)
+*Figure 7.2 — Volume only ever rounds down, on the theory that under-filling is the safe failure. Price rounds to the nearest tick either way, because a price has no safe direction to favor.*
 
 ## The alarm that cries wolf, and the alarm that never rings
 
@@ -133,6 +99,11 @@ val stopLoss: BigDecimal? = null,
 ```
 
 That one doc comment is the whole fix: `null` means *this venue doesn't have this concept*, full stop — don't even ask the question here. `0` means *this venue does have the concept, and the answer, right now, is nothing* — which is exactly when the alarm should ring. Two states, two completely different facts, and Kotlin was handing you the tool to keep them apart the entire time — a `BigDecimal?` already distinguishes "no value exists" from "the value is zero" for free. The only way to lose that distinction is to actively throw it away by treating the nullable type as if it were just a fancy zero. Don't. The type system is doing you a favor; the least you can do is not undo it.
+
+![Reading the same nullable stopLoss field two ways: null means the venue has no concept of a stop, zero means it does and the position is genuinely naked](/diagrams/chapter-07/null-versus-zero-stop.png)
+*Figure 7.3 — Same field, same query, two entirely different facts. Collapsing them either direction breaks the one job this alarm has.*
+
+That instinct — refuse rather than quietly produce a number that looks fine — runs deeper than nullable stop-losses. A backtest that can't resolve an instrument's contract size doesn't fall back to a sensible-looking `1` and carry on; it declines to run at all, on the grounds that a silently wrong multiplier would misprice every trade on that symbol for the entire run and nothing downstream would ever flag it. Refusing to start is a worse user experience and a far better outcome.
 
 (You'll hit this same fork wherever a `BigDecimal?` shows up — Chapter 5's account book has its own version: no leg book for a symbol at all is `null`, a book whose legs happen to net to exactly flat is a real `Position` sitting at quantity `0`. Same fork, same fix: ask which fact you're actually holding before you decide what to do with it.)
 

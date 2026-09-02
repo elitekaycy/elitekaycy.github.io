@@ -1,6 +1,6 @@
 ---
 title: "Backtest Reporting"
-excerpt: "Two strategies finish a backtest with the exact same headline: total P&L of $10,000. Strategy A made it in one enormous trade in the third week, and was flat or slightly losing everywhere else. Strategy B made it in a..."
+excerpt: "Two strategies finish a backtest with the exact same headline: total P&L of $10,000. Strategy A made it in one enormous trade in the third week, and was flat or slightly losing everywhere else...."
 date: 2026-07-27
 order: 9
 draft: false
@@ -20,6 +20,8 @@ Every one of these numbers is computed from the same underlying thing: a running
 data class EquitySample(val timestamp: Long, val equity: BigDecimal)
 ```
 
+Notice that the field is `equity` — the account's whole value — and not the running profit-and-loss starting from zero, which is the more obvious thing to record and what a lot of tooling plots. That choice decides whether every number built on top of it means anything. Track profit from zero and the metrics go **capital-blind**: a curve that climbs to $500 and falls back to $250 has, on its own terms, lost half of everything. Report that as a 50% drawdown and it sounds like a catastrophe. On a $10,000 account it was a 2.5% dip. The percentages that follow — drawdown, and every ratio built from returns — are only meaningful relative to the capital at risk, so the capital has to be *in* the series rather than subtracted out of it.
+
 A "reading" doesn't happen continuously — something has to decide *when* to sample, and that choice is a real tradeoff, not a formality. Sample on every tick and you get the smoothest possible picture at the cost of enormous volume and noise dominated by nothing happening. Sample only on fills and you get a clean, sparse series — but you'd miss the shape of the ride *between* trades entirely: a position that spent three days deeply underwater before finally recovering to a win looks, on a fills-only curve, exactly like a position that went straight up. qkt exposes the choice explicitly rather than picking one silently:
 
 ```kotlin
@@ -34,23 +36,8 @@ Here's a genuine memory problem hiding underneath a seemingly simple idea. A bac
 
 qkt resolves this by giving each equity reading two separate destinations with two separate memory budgets:
 
-```
-              new EquitySample(timestamp, equity)
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                            ▼
-     EquityMetrics.accept(...)      DecimatedCurve.accept(...)
-     constant memory — a few         bounded memory — capped at
-     running sums per metric,        10,000 points, for CHARTING
-     exact over every sample         only, thinned once the run
-     ever seen, however long         is long enough to exceed it
-     the run gets
-              │
-              ▼
-     maxDrawdown, Sharpe, Sortino,
-     drawdown episodes — all exact,
-     all computed in one pass
-```
+![One equity sample fanning out to two consumers: an exact, constant-memory metrics accumulator and a bounded, decimated curve for charting](/diagrams/chapter-09/one-sample-two-budgets.png)
+*Figure 9.1 — Two different memory contracts for two different jobs. The chart is allowed to be an approximation; the metrics never are.*
 
 The exact side of that split isn't new machinery invented for this chapter — `EquityMetrics` literally reuses the same `MaxDrawdownAccumulator` Chapter 6 introduced for the risk engine's live drawdown halt. Same class, same online, constant-memory shape you've now seen for candles, for risk, and here for reporting: hold a few running numbers, fold in one new reading at a time, never retain the whole history to answer a question about all of it. The chart you'd see in a UI is allowed to be an approximation of the run; the number the report actually claims as truth never is.
 
@@ -89,6 +76,9 @@ The engine's actual computation is the mean of all those per-bar returns, divide
 
 This is the real lesson, and it's a famous trap for exactly this reason: **Sharpe rewards smoothness, and a short or artificially clean sample is always smoother than reality will turn out to be.** A strategy backtested on too little data, or on unusually quiet conditions, will report a Sharpe that looks incredible — right up until it trades through a real, noisy month and the number collapses. The formula isn't lying. It's answering exactly the question it was asked, and the question was asked of a sample too small to deserve an answer that confident.
 
+![The 125-minute run's near-flat, one-trade equity curve next to a full year of ordinary market chop, with each run's Sharpe printed alongside](/diagrams/chapter-09/annualized-sharpe-trap.png)
+*Figure 9.2 — Same annualization math, two different inputs. A too-short, too-clean sample turns an unremarkable per-bar ratio into a headline number; a full year of normal chop reports what a genuinely good Sharpe actually looks like.*
+
 ## When the honest answer is "n/a"
 
 Notice what Sortino and Calmar did instead of playing along: they refused to report a number at all. That's not a gap in the tool — it's the same discipline Chapter 7 built into `BigDecimal` division, showing up again at a different layer. Sortino is built exactly like Sharpe, except its "pain" measurement only counts the *bad* swings — the standard deviation computed using nothing but the negative returns, ignoring every good one entirely, on the theory that nobody actually minds a pleasant surprise. My synthetic run, after the single entry, only ever climbed — there was no downside in the sample at all, so that denominator is genuinely, mathematically zero, and the accumulator says so rather than guessing:
@@ -125,6 +115,19 @@ class DrawdownEpisodeAccumulator(private val threshold: BigDecimal) { ... }
 ```
 
 A period is the whole episode — when the peak happened, when it bottomed (the "trough"), how long recovery took — not just the depth. A −10% drawdown that recovers in three days barely registers as a decision point; a −10% drawdown that takes eight months to climb back out of is a genuinely different, far scarier thing to hold real capital through, even though "max drawdown: −10%" reports the identical figure for both. Shallow episodes below a −1% threshold are filtered out entirely, because near-flat noise isn't a drawdown anyone needs reported — the same "don't report what isn't real signal" instinct that governs everything else in this chapter.
+
+![Two equity curves that dip to the same −10% trough from the same peak, one recovering in 15 bars and the other in 90](/diagrams/chapter-09/two-drawdowns-same-depth.png)
+*Figure 9.3 — "Max drawdown: −10%" is the identical headline for both curves. One is a brief dip; the other is a long stretch of real capital sitting underwater. `DrawdownEpisodeAccumulator` is what tells them apart.*
+
+## The number that moves when you change how you look
+
+There's one more honesty problem in this chapter, and it's the subtlest, because it isn't a bug and nothing in the report looks wrong when it happens.
+
+Annualizing needs to know how many periods there are in a year, and that depends on how often the equity curve was sampled. Sample once per closed bar and the engine works it out from the trading calendar. Sample on some other cadence and it infers the figure from the average spacing between the samples it actually received, falling back to the conventional 252 trading days only when the data is too sparse to say. All of which is reasonable — and all of which means the same run, over the same data, producing the same trades, can report a *different* Sharpe depending on the cadence you chose for sampling.
+
+Sit with that for a second, because it's a different species of problem from the one earlier in this chapter. The 434.96 was a real number honestly computed from a too-small sample. This is a real number honestly computed from a defensible choice that a reader would never think to ask about. The report names the cadence it used for exactly this reason: a ratio is only comparable against another ratio measured the same way, and quietly comparing two Sharpes sampled differently is a mistake the tool can warn you about but cannot prevent.
+
+The same instinct shows up in a much smaller decision. A drawdown episode only gets recorded if it goes deeper than −1%, a threshold fixed in the code with no user-facing lever. Above that line you'd be reporting ordinary noise as though it were an event, and a list of two hundred trivial "drawdowns" is worse than no list at all. Below it, you might miss a shallow-but-long episode that mattered. It's a judgment call, made once, applied everywhere — and worth knowing exists rather than discovering when a −0.9% grind doesn't appear in a report.
 
 ## What a report is actually for
 

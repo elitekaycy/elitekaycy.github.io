@@ -55,13 +55,17 @@ the thing that sends the order, checks if you can afford it, or decides how
 big it should be. A strategy only ever expresses **intent**.
 
 **A signal** is that intent, captured as data. "I want to buy 1 unit of
-XAUUSD" is a signal. It carries no order id, no timestamp, no confirmation
+XAUUSD" — gold, priced in US dollars — is a signal. It carries no order id, no timestamp, no confirmation
 it will ever actually happen — it's a wish, not a commitment.
 
 **An order** is the wish turned into a formal request — the kind of object
 you could hand to an actual broker. It has an identity (an order id), a
-timestamp (when the wish was formalized), a type (market? limit? stop?), and
-a price if one is needed. The gap between *signal* and *order* is where
+timestamp (when the wish was formalized), a type, and a price if one is
+needed. The type says *how* you want to be filled: a **market** order says
+"fill me now, at whatever the price is"; a **limit** order says "only at this
+price or better, and wait otherwise"; a **stop** order says "do nothing until
+the price crosses this level, then fill me at market." Each is a different
+bargain between certainty of getting filled and certainty of the price. The gap between *signal* and *order* is where
 every piece of adult supervision in a trading system lives — risk checks,
 position sizing, "wait, are we even allowed to trade right now."
 
@@ -122,7 +126,10 @@ in almost everything *except* the shape of the data:
 
 If your strategy code, or your engine's plumbing, leans on *any* assumption
 that's only true in one of these two worlds — "the current time is roughly
-now," "this call returns instantly," "this price has no spread" — you have
+now," "this call returns instantly," "the price I see is the price I get" (a
+real venue quotes a slightly higher price to buyers than to sellers, and
+that gap — the **spread** — is a cost the simulator has to model or admit
+it doesn't) — you have
 built two different systems that happen to share a strategy file. Your
 backtest results become a beautiful, convincing lie about a system that
 doesn't actually exist. This is why, as we go deeper, you'll notice an
@@ -131,23 +138,42 @@ and live run through *literally the same code path*, with only the edges
 (where data comes from, how orders actually get filled) swapped out. That's
 not paranoia. That's the actual job.
 
+Plenty of trading operations do run two systems — research in Python,
+execution on a separate engine — and hold them in agreement through
+testing and reconciliation. That works right up until it doesn't, because
+"the backtest and the live system agree" is then a claim maintained by
+ongoing effort rather than a property enforced by construction, and claims
+like that decay one small divergence at a time, invisibly, in a domain
+where the divergence surfaces as money. qkt takes the trade the other way:
+one code path, and a research experience meaningfully slower than a
+notebook, in exchange for never having to wonder.
+
+![Two sources of ticks on the left, historical and live, feed one shared engine in the middle; the engine hands orders to one of two brokers on the right, a simulator or the real venue](/diagrams/chapter-01/backtest-and-live-share-the-middle.png)
+
+*Figure 1.1 — the whole design tension in one picture. The ticks can come from a file or from the live market; the orders can go to a simulator or a real venue. Everything between those edges is one code path, and the entire trustworthiness of a backtest rests on it staying that way.*
+
 ## The loop, made concrete
 
 So: a trading engine's job is to run this loop —
 
-```
-tick arrives
-    → strategy sees it, maybe emits a signal
-        → signal becomes an order (with adult supervision applied)
-            → broker attempts to fill it
-                → a trade happens, or a rejection happens
-                    → position and P&L update
-                        → next tick arrives, repeat
-```
+![Seven boxes in a loop: the price moves, the strategy decides, it states an intent, the wish is checked, the broker tries, reality comes back, the books update, and the next tick arrives](/diagrams/chapter-01/the-trading-loop.png)
+
+*Figure 1.2 — the loop, with each step named three ways: what a trader would call it, what it is as software, and the qkt type that holds it. Every chapter from here on lives somewhere on this circle.*
 
 — identically, whether the ticks are coming from a historical file being
 replayed at whatever speed you like, or from a live feed arriving in real
 time, forever, from a venue that doesn't care about your feelings.
+
+Here is the same loop on a real run — qkt's own momentum example, on a short
+BTC price series. The line is the ticks. The strategy watches a fast moving
+average and a slow one; when the fast one crosses above the slow one it
+states an intent to buy, the order is checked and sent, the simulated broker
+fills it at the price it just saw, and from that moment the books carry a
+position whose worth rises and falls with every new tick:
+
+![A price line with a fill marked where the strategy bought, a shaded region showing the position open afterwards, and a second panel beneath showing the open profit growing from zero to one hundred and thirty-two dollars](/diagrams/chapter-01/the-loop-on-a-price-chart.png)
+
+*Figure 1.3 — the loop on a real chart. One signal, one order, one fill at 42,280, and then the books update on every tick: by the end of the series the open position is worth +$132.*
 
 Everything else in a trading system — risk management, position sizing,
 portfolios of multiple strategies, a language for describing strategies
@@ -158,22 +184,23 @@ here forward is a new idea; it's this loop, extended.
 ## qkt as the test subject
 
 qkt is one particular, real answer to "how do you actually build this loop
-so it holds up." It's written in Kotlin, and it was built the way you'd
-want any serious piece of infrastructure built: smallest possible version
-first, prove the shape works, then grow it — never the other way around,
-where you build something sprawling and hope determinism falls out by
-accident. It won't. It has to be designed in from the very first line.
+so it holds up." It's written in Kotlin, and it's built the way you'd want
+any serious piece of infrastructure built: the smallest shape that can run
+the loop, proven, then grown — never the other way around, where you build
+something sprawling and hope determinism falls out by accident. It won't.
+It has to be designed in from the first line.
 
-Its very first version was, almost word for word, that loop above, with
-nothing else:
+Strip the engine down to the smallest thing that could run the loop and it
+looks like this. Treat it as a sketch — the real engine is larger — but
+every line of the sketch corresponds to something real:
 
 ```kotlin
-interface Strategy {
+interface Strategy {                       // a decision function
     fun onTick(tick: Tick, emit: (Signal) -> Unit)
 }
 
-interface Broker {
-    fun execute(order: Order): Trade?
+interface Broker {                         // whoever can make an order real
+    fun execute(order: Order): Trade?      // null = "could not fill"
 }
 
 class Engine(/* strategy, broker, clock, id generator, price tracker */) {
@@ -189,14 +216,24 @@ class Engine(/* strategy, broker, clock, id generator, price tracker */) {
 }
 ```
 
-Read it against the table above and it should now read almost like plain
-English: a tick comes in, the price tracker is told about it, the strategy
-is asked "anything to do?", whatever it says becomes an order, the broker
-tries to fill it, and if it worked, the world is told about the trade.
+Read it against the table above and it reads almost like plain English: a
+tick comes in, the price tracker is told about it, the strategy is asked
+"anything to do?", whatever it says becomes an order, the broker tries to
+fill it, and if it worked, the world is told about the trade. And the real
+`Strategy` interface in qkt today is that same idea, with one more argument
+— a context object through which the strategy can read its own positions and
+risk state without being able to change them:
+
+```kotlin
+interface Strategy {
+    /** Called for every published tick. Emit signals via [emit] — never block. */
+    fun onTick(tick: Tick, ctx: StrategyContext, emit: (Signal) -> Unit)
+}
+```
 
 Two small design choices in that snippet are doing enormous, quiet work,
-and they're worth calling out now because we'll watch them pay off again
-and again as the system grows:
+and they're worth calling out now because they pay off again and again as
+the system grows:
 
 **The strategy talks back through a callback (`emit`), not a return
 value.** This means the strategy never actually calls the broker, never
@@ -206,19 +243,21 @@ management, portfolio-level gating, and eventually a whole rules engine get
 inserted later, without a single strategy file ever needing to change. The
 strategy never even finds out those things exist.
 
-**The broker returns a nullable result — `Trade?` — not a guaranteed
-answer.** `null` here isn't an error, it's a legitimate, expected outcome:
-"I could not fill this." Rejection is not an exceptional case bolted on
-afterward; it's baked into the type from the start, because in real
-markets, "I tried to buy something and couldn't" is not rare, it's
-Tuesday.
+**The broker's answer is allowed to be "no."** In the sketch that's the
+nullable `Trade?`: `null` isn't an error, it's a legitimate, expected
+outcome — "I could not fill this." In the real engine the answer arrives a
+moment later as an event rather than a return value, but the principle is
+identical: rejection is not an exceptional case bolted on afterward, it's
+baked into the shape from the start, because in real markets "I tried to buy
+something and couldn't" is not rare, it's Tuesday.
 
 ## Going one layer deeper: the order and the trade
 
-The snippet above waved at `Order` and `Trade` without showing them. Worth
-actually looking at them, because the fields chosen aren't arbitrary — each
-one answers a specific audit question a real trading system has to be able
-to answer later.
+The sketch waved at `Order` and `Trade` without showing them. Worth actually
+looking at them, because the fields chosen aren't arbitrary — each one
+answers a specific audit question a real trading system has to be able to
+answer later. `Trade` below is qkt's real type, field for field; `Order` is
+the sketch's simplification of a larger family of order requests.
 
 ```kotlin
 data class Order(
@@ -258,59 +297,39 @@ data class Trade(
   have a stream of fills with no way to explain why any of them happened.
   "Audit trail" isn't a log message; it's data that's structurally
   incapable of being disconnected from its cause.
-
-## Why prices aren't `Double`
-
-Worth explaining from first principles, because it trips up a lot of
-people writing their first financial system.
-
-`Double` is binary floating-point. It cannot represent `0.1` exactly — the
-closest it can get is something like
-`0.1000000000000000055511151231257827021181583404541015625`. For a single
-comparison you'd never notice. But a trading system adds, subtracts, and
-multiplies money thousands of times per session. Each operation on a
-`Double` introduces a tiny rounding error, and those errors **compound**.
-Run a strategy that opens and closes a thousand positions, and your
-reported P&L can end up a few cents off from what actually happened — not
-because of a bug, but because floating-point math is lossy by design.
-
-The fix is a type that represents a number as an exact decimal — digits
-plus a scale — with no binary approximation involved. It's slower and
-more verbose to work with than raw arithmetic, but it's *exact*. For
-money, exact beats fast, full stop — which is why every field in `Order`
-and `Trade` above holding a price or a quantity is that exact-decimal
-type, not a plain floating-point number. The full discipline this demands
-— rounding only once, at a boundary, never mid-calculation, and treating
-"I don't know this value yet" as a distinct fact from "this value is
-zero" — is enough of its own topic to earn a dedicated look later; the
-short version is: never let money math be approximate anywhere but the
-final printed digit.
+- Every price and quantity is a `BigDecimal`, never a `Double`. The short
+  version, which gets its own chapter's worth of consequences later: the
+  ordinary decimal type every language hands you cannot represent a value
+  like `0.1` exactly, and a system that multiplies money thousands of
+  times a session will drift away from what the broker's own books say.
+  For money, exact beats fast.
 
 ## Determinism, made concrete
 
-"Backtest and live must reach the same decision" is the requirement.
-What actually enforces it is two small abstractions, applied to the two
-places nondeterminism most easily sneaks in: "what time is it," and
-"what's the next order's id."
+"Backtest and live must reach the same decision" is the requirement. What
+enforces it is deceptively small: the two places nondeterminism most easily
+sneaks in — "what time is it" and "what is the next order's id" — are never
+answered by the engine itself. Time is a value the engine is *handed*: the
+live session hands it the real clock, a backtest hands it a clock that
+answers with whatever timestamp the tick being replayed carries, and the
+code asking cannot tell the difference. Order ids come from a plain counter
+— first order is always order zero — rather than anything random, so two
+runs of the same data produce byte-identical output and any difference at
+all means a code change altered behavior. Boring on purpose. Determinism
+isn't a feature added afterward; it either holds at every layer — time, ids,
+randomness — or it doesn't hold at all.
 
-Instead of code asking the operating system for the current time
-directly, "what time is it" becomes an injectable fact: production asks
-the real wall clock, a backtest asks a clock that answers with whatever
-timestamp the historical tick currently being replayed carries. The code
-doing the asking has no idea which one it's talking to, and doesn't need
-to — but it also never accidentally leaks today's real date into a replay
-of last year's prices, which is exactly the failure mode the "backtest
-vs. live" tension above described.
+Which brings us back to where this chapter started. Hand the software
+yesterday's market data and it will make yesterday's decisions, in
+yesterday's order, for reasons you can step through — that was the claim,
+and everything above is what the claim costs. Not one impressive
+mechanism, but a series of small refusals: a clock that gets handed to the
+engine rather than consulted by it, ids that come from a counter instead
+of from anywhere interesting, a strategy that may only ever describe
+intent, a broker allowed to answer "no."  None of them is clever. Each one
+closes a door that nondeterminism would otherwise walk straight through.
 
-The same logic applies to order ids. Why not generate a random unique id
-for every order? Because running the same backtest twice should produce
-*identical* output — identical order ids, identical everything — so two
-runs can be diffed and any difference immediately means a code change
-altered behavior. A random id is different every single run by
-construction, which makes two otherwise-identical backtests look
-different in every diff even when nothing that matters changed. A
-predictable, counting id generator — first order is always order zero,
-second is always order one — is boring, and that's exactly the point.
-Determinism isn't a feature bolted on afterward; it's a property that
-either holds at every layer — time, ids, randomness — or doesn't hold at
-all.
+And it is worth being clear-eyed that this is a tax. An engine written
+without any of it would be shorter, quicker to build, and would happily
+produce a backtest full of confident-looking numbers. Those numbers just
+wouldn't describe anything that could be made to happen twice.

@@ -1,31 +1,35 @@
 ---
 title: "qkt as a Subject"
-excerpt: "Before we go back to concepts, let's actually look at what we're studying. Right now qkt is 648 Kotlin files, about 94,000 lines, and roughly 2,500 commits deep. That's not a toy project someone hacked together over a..."
+excerpt: "Chapter 1 ended with a sketch of the loop: three types, about twenty lines. And it isn't wrong, either — a tick arrives, the strategy decides, the broker answers, the books update. That genuinely is..."
 date: 2026-06-08
 order: 2
 draft: false
 ---
 
-Before we go back to concepts, let's actually look at what we're studying.
-Right now qkt is **648 Kotlin files, about 94,000 lines, and roughly 2,500
-commits deep**. That's not a toy project someone hacked together over a
-weekend — it's the size of a small production system. Worth internalizing
-that scale now, because every architectural decision we're about to
-discuss was made under the pressure of *this actually has to keep working
-as it grows*, not "this is fine for a demo."
+Chapter 1 ended with a sketch of the loop: three types, about twenty
+lines. And it isn't wrong, either — a tick arrives, the strategy decides,
+the broker answers, the books update. That genuinely is what a trading
+engine does.
+
+qkt is **655 Kotlin source files and about 95,000 lines of engine code** —
+twice that once you count the tests — across **just over 2,500 commits**.
+
+The distance between those two numbers is what this chapter is about. Not
+because the sketch was a lie; it wasn't. But everything between *this
+describes the loop* and *this can be trusted with money* turned out to
+live in the gap between twenty lines and ninety-five thousand. That's a
+small production system, and every decision inside it was made under the
+pressure of having to keep working as it grew — not "this is fine for a
+demo."
 
 ## The module map, and what it tells you
 
-```
-accounting  app        backtest   broker      bus        candles
-cli         common     dsl        engine      events     evidence
-execution   indicators instrument lsp         marketdata notify
-observability observe  persistence pnl        positions  research
-risk        strategy   tools      trade
-```
+![The twenty-eight qkt packages laid out along the loop from chapter 1: market data packages under "the price moves", strategy and DSL packages under "the strategy decides", execution, risk, positions and P&L packages under "the wish is checked", the broker package under "the broker tries", and a row of plumbing packages beneath them all](/diagrams/chapter-02/packages-on-the-loop.png)
 
-Twenty-eight top-level packages. Notice what they're named after: **trading
-concepts** — `broker`, `risk`, `positions`, `pnl`, `dsl` — not technical
+*Figure 2.1 — the folders are the loop. Every package with a trading concept in its name sits on one of the four stages from Figure 1.2; the rest is plumbing those stages stand on.*
+
+Twenty-eight top-level packages, and notice what they're named after:
+**trading concepts** — `broker`, `risk`, `positions`, `pnl`, `dsl` — not technical
 roles like `service`, `repository`, `controller`, `dto`. This is a real,
 deliberate choice, and it's worth understanding the alternative it
 rejected.
@@ -35,9 +39,11 @@ A lot of software defaults to organizing by *technical layer*: all the
 "controllers" in a third. That layout makes sense when the interesting
 complexity in your system is architectural — how requests flow through
 layers. But in a trading engine, the interesting complexity is *domain*
-complexity: what's the difference between a resting order and a filled
-one, how does a trailing stop interact with a bracket, what happens when a
-broker reports a position the engine didn't expect. None of that
+complexity: what's the difference between a *resting* order (one waiting at
+the venue for its price) and a filled one; how a *trailing stop* (a stop
+that follows the price up behind a winning trade) interacts with a
+*bracket* (an entry with its stop and its target attached); what happens
+when a broker reports a position the engine didn't expect. None of that
 complexity lives "in the service layer" — it lives in the concepts
 themselves. So qkt organizes around the concepts. If you want to
 understand risk halts, you go to one folder, `risk/`, and everything
@@ -60,7 +66,7 @@ language. Notice what that says about priorities: this project treats "a
 human has to write strategies in this language comfortably" as seriously
 as it treats the execution engine itself.
 
-## The tech stack, and what else was on the table
+## The tech stack, and why Kotlin
 
 ```kotlin
 plugins {
@@ -109,46 +115,58 @@ hot path) against *where correctness and iteration speed matter far more*
 (everything else), and picking the language that serves the larger set
 well while still being fast enough where it counts.
 
-A few smaller, equally deliberate choices in that dependency list:
+The rest of that dependency list holds two choices that can be made in a
+sentence and one worth slowing down for. `ktlint` formats the code as part
+of the build rather than as a polite request, and `dokka` generates the API
+documentation out of the code's own comments — both are the same move,
+which is taking a convention that reliably decays when humans maintain it
+and making the build responsible for it instead.
 
-- **`ktlint`** — an automated code formatter wired into the build, not a
-  suggestion. This matters more than it sounds: in a codebase this size,
-  "please format your code nicely" as a human convention decays within
-  weeks. Making the build itself fail on a formatting violation means
-  style is never a matter of opinion or a review-comment tax on every PR.
-- **`dokka`** — auto-generates API documentation straight from the code's
-  own doc-comments. The alternative — hand-maintained docs living in a
-  wiki somewhere — always drifts out of sync with the code. Generating
-  docs *from* the code means they can't drift; they're either right or
-  the build breaks.
-- **JUnit 5 + AssertJ** for testing, explicitly *not* a mocking framework
-  (no Mockito, no MockK). We touched this in Chapter 1 — every "fake" in
-  the test suite is a small real object, not a magic stand-in that
-  records which methods got called. The tradeoff: writing a fake `Broker`
-  by hand takes a few more lines than `mock(Broker::class)`. What you get
-  back: a test that verifies *actual behavior* ("the trade ended up with
-  this price") instead of *implementation detail* ("this method got
-  called with these arguments") — the latter breaks every time you
-  refactor internals even when behavior didn't change, which is exactly
-  the kind of test that erodes trust in a test suite over time.
+The interesting one is what's *absent*. There is no mocking framework here
+at all — no Mockito, no MockK — in a 95,000-line codebase where you would
+expect one as a matter of course.
+
+Think about what a mock actually asserts. Write the usual "verify that
+`execute` was called with this order" and the test passes when one
+particular method received one particular argument. That's a claim about
+how the code is *written*, not about what it *does*. Rename the method,
+split it in two, route the call through a new collaborator, and the test
+goes red while the system's behaviour is byte-for-byte what it was
+yesterday. Do that a few dozen times and everyone learns that a red test
+means somebody moved some code, which is precisely the moment a test suite
+stops protecting anything.
+
+So every stand-in in qkt's tests is a small real object instead: a paper
+broker that actually fills an order, a fixed clock that actually reports
+the time it was handed. They cost a few more lines to write than a mock
+would, and what that buys is assertions about outcomes — this trade ended
+up at this price, this position ended up flat — which survive any refactor
+that doesn't change what the system does. For a codebase whose whole
+safety argument is *replay the history and compare the numbers*, tests
+that assert on numbers rather than on call sequences are the only kind
+that fit the argument.
 
 ## The discipline as a case study, not a bureaucracy
 
 Here's something worth taking seriously as a lesson in its own right,
 independent of trading: **qkt enforces a one-way promotion pipeline
-across three branches** —
+across three branches.**
 
-```
-feature branch → dev → testing → main
-```
+![Four boxes left to right: a feature branch, dev, testing, main, with the gate between each one labeled — reviewed with checks green, automatic on every green push, manual with evidence](/diagrams/chapter-02/promotion-pipeline.png)
 
-`dev` is where all work lands first, and it runs a fast test suite.
-`testing` only ever receives code that already passed `dev`'s checks, via
-an automatic fast-forward — no human retypes anything, no merge commit
-muddies the history — and it runs a slower, more thorough integration
-suite. `main`, the release branch that tags actually get cut from, only
-ever receives code that already survived `testing`, via a *manual*
-fast-forward. Nobody ever commits directly to `testing` or `main`.
+*Figure 2.2 — one direction only. Code enters at the left and can only move right, and each gate is a different kind of check: fast tests, then the slow integration suite, then a human holding a piece of evidence.*
+
+`dev` is where every change lands first, through a reviewed pull request,
+and the fast checks — build and tests, on Linux and on Windows — have to be
+green. `testing` never receives a human commit: every green push to `dev`
+triggers a job that merges it into `testing` as a promotion commit, and
+`testing` then runs the slower integration suite and builds the container
+image the live bots actually pull. `main`, the release branch that version
+tags are cut from, is stricter still: it only receives a *promotion pull
+request*, and that request can only be opened once a paper-soak run — a
+supervised, hours-long run of the exact `testing` build against a demo
+venue — has produced an attestation for that exact commit. A human reviews
+and merges it. Nobody ever commits directly to `testing` or `main`.
 
 Why go to this trouble instead of just merging to `main` when a feature's
 done? Because in a system that moves real money, the cost of *finding out

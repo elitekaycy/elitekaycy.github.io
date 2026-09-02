@@ -1,6 +1,6 @@
 ---
 title: "Deterministic Replay"
-excerpt: "Suppose someone hands you a change that touches twelve lines deep inside the order-fill handler — the same handler the last three chapters spent time inside. How do you know, for certain, that every strategy this engi..."
+excerpt: "Suppose someone hands you a change that touches twelve lines deep inside the order-fill handler — the same handler the last three chapters spent time inside. How do you know, for certain, that every..."
 date: 2026-07-20
 order: 8
 draft: false
@@ -64,33 +64,8 @@ A tie in time is never a tie in sequence. Determinism isn't really about the clo
 
 Put the clock and the sequencer together and you get a single, honest picture of what "replaying history" actually does, one tick at a time:
 
-```
-   TickFeed.next() ──► one recorded historical Tick, already fixed on disk
-          │              (no network call, no live subscription — a pull
-          │               interface over data that will never change)
-          ▼
-   clock.time = tick.timestamp        ← "now" teleports to the data's own time
-          │
-          ▼
-   pipeline.ingest(tick)
-          │
-          ▼
-   Engine.onTick(tick)
-     ├─► priceTracker.update(tick)
-     └─► bus.publish(TickEvent(tick))
-              │
-              stamped with (clock.now(), sequencer.next())
-              │
-   ┌──────────┼──────────────────────────────────┐
-   ▼          ▼                                  ▼
-strategies  indicators                    risk engine, position ledger,
- & DSL       & candle                     order manager — everything
- rules       builder                      Chapters 3–7 already built
-   │
-   └─► signal → order → (simulated) fill → the SAME accounting fold
-                                             from Chapter 5, the SAME
-                                             halt rules from Chapter 6
-```
+![One historical tick moving through the deterministic pipeline: the feed, the teleporting clock, the stamped event, its subscribers, and the resulting simulated fill](/diagrams/chapter-08/one-tick-through-the-pipeline.png)
+*Figure 8.1 — Every one of these four steps is a pure function of the tick just handed to it and state built from earlier ticks in this same run — nothing reaches outside that sequence.*
 
 Nothing in that diagram makes a network call, reads the system clock, or depends on wall time anywhere. Every box is a pure function of the tick it was just handed and whatever state the run has already accumulated from *earlier* ticks in the same deterministic sequence — never from anything outside it. Feed it the same file twice, you get the same diagram traced the same way twice.
 
@@ -106,26 +81,12 @@ fun run(): BacktestResult = toEngine().runToEnd()
 
 And `ReplayEngine` isn't backtest-only machinery — it's the same deterministic driver used by the tooling that checks a real live trading session against what history says should have happened. `Engine`, the tiny object that turns a tick into a `TickEvent` on the bus, says as much directly in its own documentation: *"the backtest replay engine and the live `TickFeed` are the two production producers"* feeding it ticks. Two front doors, one engine behind both of them:
 
-```
-   BACKTEST                              LIVE-PARITY REPLAY
-   research question:                    audit question:
-   "what would this strategy             "did this real session's
-    have done against history?"           actual behavior match
-        │                                 what history predicts?"
-        ▼                                       ▼
-   historical TickFeed              recorded ticks from a live session
-        │                                       │
-        └───────────────┬───────────────────────┘
-                         ▼
-                  ReplayEngine
-                         │
-                         ▼
-            TradingPipeline · OrderManager
-          position ledger (Ch. 5) · risk engine (Ch. 6)
-           — completely unmodified either way —
-```
+![Two different questions — a backtest and a live-parity replay — feeding two different tick sources into the same unmodified ReplayEngine](/diagrams/chapter-08/one-engine-two-front-doors.png)
+*Figure 8.2 — A research question and an audit question, answered by literally the same code path. Only the tick source at the top changes.*
 
 The strategy code, the position ledger, the risk engine, the accounting fold — none of it is reimplemented, simplified, or approximated for backtesting. It's the identical code path a real account runs, fed a different, deterministic source instead of a live one. Even the smallest guardrails carry that discipline through on purpose. The pipeline's tick-validation gate — the one that drops a malformed price before it can poison an indicator — says it outright in its own comment: *"Identical in backtest and live so the gate itself cannot cause divergence."* Not "similar." Identical.
+
+This has a price, and it's a large one worth naming rather than glossing. Every replayed tick goes through the full production dispatch path — the event bus, a dozen synchronous subscribers, the risk engine, the order manager — virtual call by virtual call. A purpose-built backtester doing bulk operations over whole price arrays, which is how research tooling in this field usually works, is comfortably an order of magnitude faster, and that speed is not a luxury once a parameter search is running hundreds of backtests. qkt spends it anyway, because what the money buys is that no second implementation of a stop trigger, a fill rule, a halt condition or a rounding decision exists to drift away from the live one while nobody is watching. A faster backtest that answers a slightly different question than the live engine isn't a faster backtest; it's a confident answer to a question you didn't ask.
 
 ## The one honest exception
 

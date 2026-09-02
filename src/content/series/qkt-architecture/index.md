@@ -21,6 +21,7 @@ parts:
       - chapter-08-deterministic-replay
       - chapter-09-backtest-reporting
       - chapter-10-parameter-sweeps-and-walk-forward-analysis
+      - chapter-11-backtest-fidelity
 ---
 
 A chapter-by-chapter walkthrough of trading systems in general, and `qkt` — an

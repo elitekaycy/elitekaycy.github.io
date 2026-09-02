@@ -1,6 +1,6 @@
 ---
 title: "Position Tracking and P&L"
-excerpt: "Say a strategy buys 0.1 lots of gold. A moment later, does it own 0.1 lots of gold? Obviously — that's what a fill means. Now say the same strategy, five minutes later, sells 0.1 lots of gold. Does it now own nothing?..."
+excerpt: "Say a strategy buys 0.1 lots of gold. A moment later, does it own 0.1 lots of gold? Obviously — that's what a fill means. Now say the same strategy, five minutes later, sells 0.1 lots of gold. Does..."
 date: 2026-06-29
 order: 5
 draft: false
@@ -15,6 +15,9 @@ The honest answer is: it depends entirely on which broker you're trading with, a
 This split isn't arbitrary, and it isn't just a technical curiosity either broker happened to build. US-regulated forex accounts are legally required to net, first-in-first-out — a rule aimed at stopping traders from disguising a losing position by opening an offsetting one instead of just closing it. Retail MT5 accounts outside that jurisdiction very often hedge instead, and traders genuinely want that: imagine running two independent systems on the same instrument — one a breakout system that just went long gold, one a mean-reversion system that just went short gold on the same move. On a netting account those two signals partially or fully cancel into one blended number, and you lose the ability to tell which system is actually working. On a hedging account they're two real, separately-tracked positions, each judged on its own merits. The tradeoff is capital: a hedging account generally has to post margin against both sides (brokers often give a discount for the fact that the combined risk is bounded, but rarely erase it entirely), where a netting account only ever posts margin against the one net exposure. Faster feedback and cleaner attribution, at the cost of tying up more capital — a real decision a trader makes when choosing a broker, not an implementation detail underneath one.
 
 So the position model has to be honest about which world it's in, and it has to know that per venue, because a portfolio can — and does — trade several brokers with different rules at once. If qkt modeled every account as if it netted, a hedging strategy deliberately holding a winning long and a losing short at the same time, on purpose, would be lied to about its own risk the moment the engine collapsed those into one number.
+
+![The same two fills read on a netting account and on a hedging account](/diagrams/chapter-05/two-fills-two-worlds.png)
+*Figure 5.1 — The same two fills, read two different ways. A netting account has nothing left after the sell — the position is the diff. A hedging account still has two separate open tickets after it, each quietly accruing its own cost.*
 
 ## One position isn't the shape of the truth
 
@@ -44,7 +47,12 @@ Every leg also carries a `role`, and the role is the vocabulary for *why* this l
 - **STACK** — a pyramided add-on, carrying `parentLegId` back to the primary that spawned it. It survives after the primary closes.
 - **INDEPENDENT** — a leg that coexists with others on the same symbol without netting into them at all: each side of a straddle, or any entry on a hedging venue where the venue itself keeps positions separate.
 
+Those roles aren't merely descriptive labels, either — the book enforces the one that has to be unique. Adding a second PRIMARY to a book that already has one is refused outright, loudly, rather than accepted. The failure it's guarding against is quiet rather than dramatic: with two legs both claiming to be the strategy's single netting position, two different code paths can each average fills into a different record, and one logical position ends up with its cost basis split across two disagreeing numbers. Nothing crashes. The P&L is just wrong from then on. A rejected write is the cheapest possible version of that problem.
+
 A collection of these for one (strategy, symbol) pair is a `LegBook`. Most of the time a book holds exactly one leg — a strategy that never stacks or straddles never notices any of this — but the shape is there for when it needs to be, without every ordinary strategy paying for it.
+
+![Three legs on one symbol, each carrying a role and, for the stack, a link back to its parent](/diagrams/chapter-05/one-strategy-three-legs.png)
+*Figure 5.2 — One strategy, one symbol, three legs open at once: an ordinary entry, a pyramided add-on that knows which leg spawned it, and an independent leg that never nets with either.*
 
 ## The real question: what does a fill *mean*?
 
@@ -110,6 +118,9 @@ Second, when the order trail is gone: whether the strategy already owns a leg ca
 
 Third, and last: if neither the order nor a known ticket says anything, fall back to the venue's default — hedging opens a fresh independent leg, everything else nets. This is the same decision the planner would have made in advance; the resolver just has to be able to make it live, for the rare fill that genuinely carries no other trace.
 
+![The five steps from a strategy's decision to a booked leg, decided once and read back rather than guessed](/diagrams/chapter-05/meaning-decided-before-the-fill.png)
+*Figure 5.3 — Intent travels with the order, not around it. Steps 1–2 happen before anything reaches a broker; step 4 only ever reads what step 2 already decided.*
+
 ## The ledger: one writer, one truth
 
 All three intent kinds converge on a single method, on a single object: `StrategyPositionTracker.applyFillDetailed`. This is the ledger. It is the *only* place a fill ever changes what a strategy is holding, and its handling of the three intents is an exhaustive `when` — there is no fourth path, no fallback that silently does something else:
@@ -150,6 +161,8 @@ class AccountPositionView internal constructor(
 
 Underneath, the ledger keeps a small index — one net `Position` per symbol, folded across every strategy's leg books — and rebuilds just that one symbol's entry the instant any leg on it changes. Reading the account's exposure is then a plain map lookup, not a fold over every strategy every time someone asks. The account never has its own opinion to fall out of sync with the ledger's, because it isn't an opinion at all — it's a cached answer to a question the ledger can always re-derive.
 
+That rebuild is where the bill arrives, and it's worth being precise about it rather than presenting the design as free. Every fill re-folds every leg every strategy holds on that symbol, rather than adjusting the cached number by the amount that just changed. An incremental update would be a single addition; this is a loop whose length grows with how many strategies trade the symbol and how many legs each one holds. The reason to accept that is the failure it makes impossible: an incremental update is a second place that computes the account's position, and the instant it disagrees with the ledger — one missed edge case, one path that forgot to adjust — nothing in the system can tell you which of the two numbers is the real one. Re-deriving is slower and can only ever produce one answer.
+
 This is the same shape you'll see again in the next chapter for risk state, and it's worth naming as a general principle now: when a quantity can be *computed* from another quantity that's already the single source of truth, don't give it a second, independently-mutated home. Derive it, and derive it eagerly enough that reading it stays cheap.
 
 ## Unrealized P&L has to walk legs, not net numbers
@@ -170,6 +183,9 @@ if (positions is LegExposureProvider) {
 ```
 
 Every open leg contributes its own mark-to-market independently, and the strategy or account figure is the sum of those individual truths — never a shortcut through a blended net quantity that could hide two real, opposite risks behind one deceptively small number.
+
+![Five days of a locked long and short: the net line stays flat at zero while spread, commission, and swap keep bleeding money underneath it](/diagrams/chapter-05/locked-position-still-bleeds.png)
+*Figure 5.4 — A simulated locked position: 0.1 lot bought and 0.1 lot sold on the same symbol at the same price. The net directional risk really is zero. The cost of holding both legs open is not.*
 
 That `contractSize` multiplier in the middle of the formula is doing real work and deserves its own word. A "lot" in forex and CFD trading is not one unit of the thing you're trading — a standard lot of EUR/USD represents 100,000 units of euros, a lot of gold might represent 100 troy ounces, and every instrument defines its own multiplier. A one-dollar move in the quoted price of gold is not one dollar of profit or loss; it's one dollar times the contract size times however many lots you hold. Skip that multiplier, or get it wrong for one instrument, and every single trade on that symbol is silently mispriced by a fixed, wrong factor — which is why the engine looks the instrument up rather than assuming quantity and price difference alone tell the whole story.
 
@@ -208,6 +224,9 @@ private fun foldAccounted(a: FillAccountedEvent) {
 ```
 
 This is genuinely just publish/subscribe applied to accounting rather than to price ticks — the same pattern the event bus already gave the system, pointed at a new kind of fact. And it buys the same thing it always buys: every subscriber sees the identical, already-computed number, in a fixed order, with the risk-relevant ones (halt evaluation) guaranteed to run before anything that has an external side effect. Nobody downstream re-derives "what happened here" — they're told, once, by the one place authorized to have decided it.
+
+![One fill, priced once through three steps, then fanned out to five subscribers that never recompute it themselves](/diagrams/chapter-05/priced-once-told-to-everyone.png)
+*Figure 5.5 — `bookExecution` prices a fill exactly once. Every downstream consumer — including the halt check, which runs last on purpose — reads that one number instead of recomputing its own.*
 
 The event also carries a `kind` — an ordinary execution, a **financing accrual** (the overnight swap charge mentioned above, applied even on days the position doesn't trade at all, purely for holding it past the venue's daily rollover), or a reconcile of value the venue realized while the daemon wasn't running to see it happen live. All three still enter through the same fold, so the account's lifetime P&L is honest about money the strategy actually made or lost — but a reconcile of history from before this session correctly counts toward *lifetime* totals without corrupting *today's* loss budget, since a risk rule watching for a bad day shouldn't be tripped by yesterday's outcome arriving late.
 

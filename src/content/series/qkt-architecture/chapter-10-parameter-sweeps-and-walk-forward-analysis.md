@@ -1,6 +1,6 @@
 ---
 title: "Parameter Sweeps and Walk-Forward Analysis"
-excerpt: "Chapter 9 showed one way a backtest report can lie to you: a headline number, like a triple-digit Sharpe ratio, that looks spectacular purely because the sample behind it was too short or too suspiciously smooth to de..."
+excerpt: "Chapter 9 showed one way a backtest report can lie to you: a headline number, like a triple-digit Sharpe ratio, that looks spectacular purely because the sample behind it was too short or too..."
 date: 2026-08-03
 order: 10
 draft: false
@@ -92,17 +92,8 @@ The 00:40–01:20 window above is called the **in-sample** period — abbreviate
 
 One fold proves very little on its own — it's one 20-minute grade, and Chapter 9 already showed how little a single short sample can be trusted. Walk-forward analysis repeats the whole two-step process over and over, sliding both windows forward through time by a fixed **step**, so the same discipline gets applied many times against genuinely different stretches of history:
 
-```
-   total historical range
-   ├──────────────────────────────────────────────────────────►  time
-
-   fold 1:  [======= train =======][== test ==]
-   fold 2:          [======= train =======][== test ==]
-   fold 3:                  [======= train =======][== test ==]
-
-              (each fold's test window is a stretch of history
-               that fold's parameter search never once saw)
-```
+![Four overlapping train windows sliding forward through the same historical range, each followed by its own non-overlapping test window](/diagrams/chapter-10/rolling-folds-through-history.png)
+*Figure 10.1 — Train windows overlap on purpose; test windows never do. Fold 3's test window is the exact 20 minutes walked through by hand above.*
 
 ```kotlin
 internal fun rollingWindows(total: TimeRange, trainSize: Duration, testSize: Duration, stepSize: Duration)
@@ -133,6 +124,9 @@ Find fold 3 in that table: `IS n/a`, `OOS 413.44491801`. That's not a coincidenc
 
 Two things in this table matter more than any single fold's number. First: `winner stability: emaFast=5,emaSlow=21×4` — the *identical* configuration won every single fold, across four training windows that overlap each other but four test windows that never overlap with each other, and that each winner never touched during its own selection. That repetition is the evidence actually worth trusting. A configuration that keeps winning on fresh, disjoint test slices is behaving like it captured something real about the underlying price behavior; a walk-forward run where a *different* configuration wins nearly every fold is telling you, directly, that "the best parameters" are just whichever ones happened to fit each window's own local noise — an unstable, fold-by-fold coin flip with extra steps, not a discovery.
 
+![Sharpe ratios for the four folds: two bars missing entirely (no trades, correctly n/a), one in-sample bar, one out-of-sample bar, all from the identical winning configuration](/diagrams/chapter-10/winner-stability-across-folds.png)
+*Figure 10.2 — The same `emaFast=5, emaSlow=21` won every fold that had anything to measure. A different winner each fold would be the tell that the search was fitting noise, not signal.*
+
 Second: notice how many `n/a` entries are scattered through the table — exactly like fold 3's own training step, and exactly like Chapter 9's honest refusal to fabricate a ratio from an undefined denominator. A fold whose window happened to contain no real signal correctly says so, rather than inventing a number to fill the cell.
 
 ## The curve that's actually allowed to be trusted
@@ -151,3 +145,7 @@ This concatenated curve is the one number in this whole chapter that deserves re
 ## What this doesn't fix
 
 It would be dishonest to end here without naming the limit. Walk-forward analysis doesn't *prove* a strategy is good — it only proves that it survived being tested honestly, more than once, on data it never saw during selection. It's also genuinely expensive: a full parameter sweep runs once *per fold*, not once for the whole study, so the computational cost scales with both the size of the parameter grid and the number of folds. And the discipline can still be defeated by a human standing outside the tool entirely — a researcher who runs the whole walk-forward study, doesn't like the answer, tweaks the strategy's *logic* (not just its parameters), and reruns the exact same walk-forward split has just turned the entire study into one more in-sample decision, made in slow motion, by hand. The tool enforces the boundary between train and test inside one run. It cannot enforce discipline on the person deciding what to try next.
+
+Two smaller limits are worth carrying out of this chapter as well, because both are easy to read past. Ranking is a stable sort with no explicit tiebreak, so when configurations score identically — as all six did in the fold walked through by hand, every one tied at zero trades — the winner is whichever appeared first in the list. That's deterministic, which is the property that matters most, but it means a fold whose winner never traded is reporting list order rather than merit. And the stitched curve skips every training period, so its time axis has holes: the elapsed time along it is shorter than the calendar span of the study. It's an honest record of decisions made blind, not a picture of an account over a continuous stretch of history.
+
+There's a revealing asymmetry in what it does warn about, too. Search a very large parameter grid and the harness will tell you the trial count is getting dangerous — that's the coin-flipping problem from the start of this chapter, and it's watched for. Run a study with a single fold and nothing objects at all. Four folds, in a chapter about not trusting one short sample, is itself a small number; the machinery that catches you for asking too many questions has nothing to say when you accept an answer built on too little evidence. Both are ways to fool yourself. Only one of them currently trips an alarm.

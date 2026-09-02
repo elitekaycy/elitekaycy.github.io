@@ -1,6 +1,6 @@
 ---
 title: "The Risk Engine"
-excerpt: "A strategy's logic is built to answer one question, over and over: given what the market just did, should I buy, sell, or wait? It is not built to answer a very different question: am I currently in the process of doi..."
+excerpt: "A strategy's logic is built to answer one question, over and over: given what the market just did, should I buy, sell, or wait? It is not built to answer a very different question: *am I currently in..."
 date: 2026-07-06
 order: 6
 draft: false
@@ -38,32 +38,16 @@ sealed class HaltDecision {
 
 You genuinely cannot collapse these into one mechanism, because they run on different triggers — one only has something to check when an order shows up, the other has to be checked continuously whether or not one does:
 
-```
-STRATEGY SIGNAL                             MARKET TICK  or  FILL
-      │                                              │
-      ▼                                              ▼
- OrderRequest                                riskState.onTick() / onFill(...)
-      │                                              │
-      ▼                                              ▼
- RiskEngine.approve(request)                 RiskEngine.evaluateHaltRules()
-   ├─ strategy halted? ─yes─► risk-reducing?           │
-   │        │ no              │yes    │no       for each HaltRule:
-   │        │                 ▼        ▼             evaluate(riskState)
-   │        │            let through  REJECT              │
-   │        ▼                                    ┌─────────┴─────────┐
-   ├─ per-request RiskRule(s)                 Continue            Halt(id?, scope)
-   │    (position size, notional...)          (nothing               │
-   │        │                                  changes)     riskState.halt(...)
-   │   reject on first failure                                or .haltStrategy(...)
-   ▼
- Decision.Approve → order reaches the broker
-```
+![Two independent risk questions: approve(request) triggered by an order, evaluateHaltRules() triggered by every tick and fill](/diagrams/chapter-06/two-questions-risk-answers.png)
+*Figure 6.1 — The same `RiskEngine`, answering two different questions on two different triggers. Approving an order can also reject risk-reducing exceptions on the way — see the next section — but the two paths never merge into one.*
 
 `approve` runs once per order, right before it leaves the pipeline — a question about *this* order. `evaluateHaltRules` runs on every tick and every fill — a standing question about the account's condition, asked whether or not anyone is currently trying to trade. `RiskEngine` owns both, but they're independent paths through it.
 
 ## What "equity" and "drawdown" actually mean here
 
-Two numbers sit underneath almost every halt rule, and both deserve to be defined precisely rather than assumed. **Equity** is the account's true value at this instant — not just realized, banked profit, but realized profit plus the current floating gain or loss on everything still open. This matters because a position that's deep underwater but hasn't been closed yet is still real, spendable risk: if the market keeps moving against it, that unrealized loss becomes a realized one, and a risk system that only counted closed trades would be structurally blind to a strategy actively bleeding out in real time. `EquityTracker` computes exactly this, on demand, from the same realized and unrealized figures Chapter 5 built:
+Ask a trader how much money they have and you should get a pause, because there are two honest answers. There's what's been banked — positions closed, profit or loss finalized, nothing left to argue about. And there's what the account would be worth if every position still open were closed right now, at whatever the market is quoting this second. A supervisor watching only the first number is structurally blind to a strategy that is bleeding out in real time and simply hasn't closed anything yet.
+
+So the two numbers underneath almost every halt rule deserve to be defined precisely rather than assumed. **Equity** is the account's true value at this instant — not just realized, banked profit, but realized profit plus the current floating gain or loss on everything still open. This matters because a position that's deep underwater but hasn't been closed yet is still real, spendable risk: if the market keeps moving against it, that unrealized loss becomes a realized one, and a risk system that only counted closed trades would be structurally blind to a strategy actively bleeding out in real time. `EquityTracker` computes exactly this, on demand, from the same realized and unrealized figures Chapter 5 built:
 
 ```kotlin
 fun update(): Boolean {
@@ -109,44 +93,9 @@ This particular rule is deliberately **realized-only** — it watches money that
 
 It's worth walking through exactly what happens on a single tick, because "global" and "per-strategy" risk aren't two separate systems — they're the same tracking machinery running twice, once folded across everything and once per strategy, feeding two separate populations of halt rules:
 
-```
-                              TickEvent
-                                 │
-                                 ▼
-                        riskState.onTick()
-                 ┌───────────────┴────────────────┐
-                 ▼                                 ▼
-     equityTracker.update()            equityTracker.updateStrategies()
-     ONE global figure:                 loops every strategy the
-     startingBalance                    tracker already knows about
-     + realizedTotal()
-     + unrealizedTotal()                       │
-                 │                    ┌─────────┼─────────┐
-                 ▼                    ▼         ▼         ▼
-        peakTotalEquity          Strategy A  Strategy B  Strategy C
-        (global high-water)      own equity  own equity  own equity
-                                  own peak    own peak    own peak
-                 │                    │         │         │
-                 └────────────────────┴─────────┴─────────┘
-                                       │
-                                       ▼
-                        riskEngine.evaluateHaltRules()
-                                       │
-                ┌──────────────────────┴───────────────────────┐
-                ▼                                               ▼
-       GLOBAL halt rules                             PER-STRATEGY halt rules
-       e.g. MaxDrawdown, MaxDailyLoss                 e.g. MaxStrategyDrawdown("A"),
-       read riskState.drawdownTracker                      MaxStrategyDrawdown("B"), ...
-            .globalDrawdown()                        read riskState.drawdownTracker
-                │                                          .strategyDrawdown("A")
-                ▼                                               │
-       Halt(strategyId = null)                          Halt(strategyId = "A")
-                │                                               │
-                ▼                                               ▼
-       riskState.halt(...)                          riskState.haltStrategy("A", ...)
-       → A, B, and C are ALL blocked                 → only A is blocked
-                                                        B and C keep trading normally
-```
+![One price update fans out into a whole-account measurement and a per-strategy measurement, both compared against limits, ending in one of three outcomes: stop everything, stop one strategy, or carry on](/diagrams/chapter-06/tick-risk-fanout.png)
+
+*Figure 6.2 — what one tick sets in motion. The same money gets measured twice — once for the whole account, once per strategy — and the same limit-check can end three ways. Notice the middle outcome: only strategy A stops; B and C never notice.*
 
 Nothing here is a different code path bolted on for "multi-strategy support" — it's the same `EquityTracker`/`DrawdownTracker` pair, just asked the question once with a symbol-agnostic global fold and once per strategy id, and a `HaltRule` list where each rule already knows which population it's answering for. Configure one `MaxStrategyDrawdown` instance per strategy that needs its own limit, and each evaluates and trips completely independently of its siblings — the shared tracker underneath is what makes that cheap rather than requiring N separate risk subsystems for N strategies.
 
@@ -158,34 +107,20 @@ Not every halt should behave the same way once it's tripped, because not every b
 enum class HaltScope { DAILY, PERSISTENT, TRANSIENT }
 ```
 
-```
-                          HaltRule trips
-              ┌────────────────┼─────────────────┐
-              ▼                ▼                  ▼
-        scope=DAILY      scope=PERSISTENT    scope=TRANSIENT
-       (daily-loss rule)  (drawdown rule)   (session replacement)
-              │                │                  │
-              ▼                ▼                  ▼
-         ┌─────────┐     ┌───────────┐      ┌───────────┐
-         │ HALTED  │     │  HALTED   │      │  HALTED   │
-         └────┬────┘     └─────┬─────┘      └─────┬─────┘
-              │                │                    │
-      next UTC midnight    an operator        old session ends,
-      (automatic, no       explicitly         a new one starts —
-       operator needed)    calls resume()     never written to disk,
-              │                │              so the new session
-              ▼                ▼              simply starts unhalted
-       auto-resumed      stays halted
-                          until cleared
-```
+![A tripped HaltRule healing three different ways depending on its scope: auto-resume, stay halted, or never persist](/diagrams/chapter-06/halt-scope-healing.png)
+*Figure 6.3 — Same trip, three different fates. A daily-loss halt heals with the calendar; a drawdown halt waits for a human; a transient halt simply doesn't survive a restart.*
 
 `DAILY` auto-resumes at the next UTC day boundary. `PERSISTENT` stays halted until an operator explicitly clears it. `TRANSIENT` is narrower still — it exists only for the current running session and is deliberately never persisted, so a restart begins clean rather than inheriting a state that no longer describes reality.
+
+The scope isn't just a label on a live halt, though — it's what makes a *restart* safe, and that's where it earns its place. When the daemon comes back up it has to decide which halts to reimpose, and there are two ways to get that wrong in opposite directions. Forget a `PERSISTENT` drawdown halt and a blown account quietly resumes trading. Faithfully restore yesterday's `DAILY` loss halt and the account is stuck behind a limit the calendar already cleared, permanently, because every restart revives it again. So restoration reads the scope: a `DAILY` halt from a past UTC day is deliberately *not* restored, while a `PERSISTENT` halt and a same-day `DAILY` halt come back exactly as they were. The three scopes exist so that sentence can be written at all.
 
 Halts also come in two granularities, matching the two things a limit can legitimately be *about* — visible directly in the diagram above: a per-strategy halt stops one strategy while its siblings on the same account keep trading, appropriate when the problem is that one specific system is malfunctioning, not the whole portfolio; a global halt stops everything, appropriate when the account itself, in aggregate, has crossed a line, at which point which individual strategy contributed most to it stops being the relevant question.
 
 ## The one thing a halt must never do: trap you in a position
 
 Here's a failure mode worth sitting with directly. Imagine a strategy trips its drawdown halt while it's holding an open, losing position. If a halt simply blocked *every* order for that strategy, the very position that caused the halt could now never be closed — the supervisor meant to protect the account would instead be actively preventing it from getting out of the exact danger it just flagged. That would be worse than doing nothing.
+
+This isn't qkt being clever, either — it's codified industry practice. The Futures Industry Association's guidance on automated trading risk controls says the same thing: a kill switch has to stop new exposure without stranding a trader inside the position it just flagged. qkt's rule is that principle written as a function.
 
 So a halt only blocks *new* risk, never the way out. Before rejecting anything, the engine checks whether the incoming order can only shrink exposure — a close targeting a specific venue ticket, or an opposite-side order no larger than the position currently held:
 
@@ -198,32 +133,8 @@ fun isRiskReducing(request: OrderRequest, positions: PositionProvider): Boolean 
 }
 ```
 
-```
-       Strategy is HALTED, an order arrives
-                       │
-                       ▼
-       Is this order risk-REDUCING?
-       (a close-by-ticket, OR an opposite-
-        side order with qty ≤ open position)
-              │                  │
-             YES                 NO
-              │                  │
-              ▼                  ▼
-    let it through          REJECT
-    (still runs the         "halted: <reason>"
-     per-request caps
-     below it — a huge
-     "reducing" order can
-     still be capped)
-              │
-              ▼
-    opposite side but LARGER
-    than the position? → that
-    flips long↔short, which is
-    NEW exposure in the other
-    direction — NOT reducing,
-    correctly still rejected
-```
+![A halted strategy's order tested for risk-reducing before rejecting: a close-by-ticket or same-or-smaller opposite side gets through, everything else is rejected](/diagrams/chapter-06/halted-but-not-locked-in.png)
+*Figure 6.4 — A halt blocks new exposure, not the way out. An opposite-side order still has to fit inside the open position, or it stops being an exit and starts being a reversal.*
 
 The size check matters as much as the direction check. An opposite-side order *larger* than the current position wouldn't just close it — it would flip the account from long to short (or back), which is genuinely *new* exposure in a different direction, not an exit, and that's correctly still blocked while halted. Only an order that can do no more than bring the position toward flat is let through. A halt, in other words, is a one-way valve on new risk — never a lock on the door.
 
