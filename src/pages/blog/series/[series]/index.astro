@@ -1,0 +1,87 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../../../layouts/Base.astro';
+import { seriesSlug, getChaptersForSeries, chapterSlug, readingTime } from '../../../../lib/content';
+
+export async function getStaticPaths() {
+  const series = await getCollection('series', ({ data }) => !data.draft);
+  return series.map((entry) => ({
+    params: { series: seriesSlug(entry) },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const slug = seriesSlug(entry);
+const { Content } = await render(entry);
+const chapters = await getChaptersForSeries(slug);
+const chapterBySlug = new Map(chapters.map((c) => [chapterSlug(c), c]));
+const totalMinutes = chapters.reduce((sum, c) => sum + readingTime(c.body ?? ''), 0);
+const firstChapterSlug = entry.data.parts[0]?.chapters[0];
+---
+
+<Base title={entry.data.title} description={entry.data.excerpt}>
+  <article class="mx-auto max-w-3xl px-6 py-16 sm:px-8 sm:py-20">
+    <a href="/blog" class="text-sm transition-colors hover:underline" style="color: var(--fg-muted)">&larr; Back to blog</a>
+
+    <header class="mt-8 border-b pb-8" style="border-color: var(--border)">
+      <div class="flex items-center gap-3 text-xs" style="color: var(--fg-muted)">
+        <span class="rounded-full border px-2 py-0.5 font-mono" style="border-color: var(--border)">series</span>
+        <span>&middot;</span>
+        <span>{chapters.length} chapters</span>
+        <span>&middot;</span>
+        <span>{totalMinutes} min total</span>
+      </div>
+      <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl" style="color: var(--fg)">
+        {entry.data.title}
+      </h1>
+      <div class="prose prose-neutral mt-4 max-w-none text-base" style="color: var(--fg-muted)">
+        <Content />
+      </div>
+      {firstChapterSlug && (
+        <a
+          href={`/blog/series/${slug}/${firstChapterSlug}`}
+          class="mt-6 inline-block rounded-lg px-4 py-2.5 text-sm font-medium"
+          style="background: var(--accent); color: var(--bg)"
+        >
+          Start reading &rarr;
+        </a>
+      )}
+    </header>
+
+    <div class="mt-10 space-y-10">
+      {entry.data.parts.map((part, partIndex) => (
+        <div>
+          <h2 class="font-mono text-xs uppercase tracking-wider" style="color: var(--fg-muted)">
+            Part {partIndex + 1} &middot; {part.title}
+          </h2>
+          <ol class="mt-4 space-y-2">
+            {part.chapters.map((chSlug) => {
+              const ch = chapterBySlug.get(chSlug);
+              if (!ch) return null;
+              return (
+                <li>
+                  <a
+                    href={`/blog/series/${slug}/${chSlug}`}
+                    class="flex items-baseline justify-between gap-4 rounded-lg border px-5 py-4 transition-colors"
+                    style="border-color: var(--border)"
+                  >
+                    <span style="color: var(--fg)">
+                      <span class="mr-2 font-mono text-xs" style="color: var(--fg-muted)">
+                        {String(ch.data.order).padStart(2, '0')}
+                      </span>
+                      {ch.data.title}
+                    </span>
+                    <span class="shrink-0 text-xs" style="color: var(--fg-muted)">
+                      {readingTime(ch.body ?? '')} min
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+    </div>
+  </article>
+</Base>

@@ -1,0 +1,28 @@
+---
+import ThemeToggle from './ThemeToggle.astro';
+
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/blog', label: 'Blog' },
+];
+---
+
+<header class="border-b" style="border-color: var(--border)">
+  <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-6 sm:px-8">
+    <a href="/" class="font-mono text-sm font-medium tracking-tight" style="color: var(--fg)">
+      elitekaycy
+    </a>
+    <nav class="flex items-center gap-6">
+      {nav.map((item) => (
+        <a
+          href={item.href}
+          class="text-sm transition-colors"
+          style="color: var(--fg-muted)"
+        >
+          {item.label}
+        </a>
+      ))}
+      <ThemeToggle />
+    </nav>
+  </div>
+</header>

@@ -1,0 +1,164 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../../../layouts/Base.astro';
+import {
+  seriesSlug,
+  chapterSlug,
+  getChaptersForSeries,
+  readingTime,
+} from '../../../../lib/content';
+
+export async function getStaticPaths() {
+  const seriesEntries = await getCollection('series', ({ data }) => !data.draft);
+  const paths = [];
+
+  for (const s of seriesEntries) {
+    const slug = seriesSlug(s);
+    const chapters = await getChaptersForSeries(slug);
+    for (const ch of chapters) {
+      paths.push({
+        params: { series: slug, chapter: chapterSlug(ch) },
+        props: { series: s, chapter: ch, chapters },
+      });
+    }
+  }
+
+  return paths;
+}
+
+const { series, chapter, chapters } = Astro.props;
+const slug = seriesSlug(series);
+const { Content, headings } = await render(chapter);
+const inPageHeadings = headings.filter((h) => h.depth <= 3);
+
+const currentSlug = chapterSlug(chapter);
+const currentIndex = chapters.findIndex((c) => chapterSlug(c) === currentSlug);
+const prev = currentIndex > 0 ? chapters[currentIndex - 1] : null;
+const next = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null;
+
+const formattedDate = chapter.data.date.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<Base title={`${chapter.data.title} — ${series.data.title}`} description={chapter.data.excerpt}>
+  <div class="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:grid lg:grid-cols-[240px_1fr] lg:gap-12">
+    <!-- Floating chapter sidebar -->
+    <aside class="hidden lg:block">
+      <div class="sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto pb-8">
+        <a href={`/blog/series/${slug}`} class="text-xs transition-colors hover:underline" style="color: var(--fg-muted)">
+          &larr; {series.data.title}
+        </a>
+        <ol class="mt-4 space-y-1 border-l pl-4" style="border-color: var(--border)">
+          {chapters.map((c) => {
+            const isCurrent = chapterSlug(c) === currentSlug;
+            return (
+              <li>
+                <a
+                  href={`/blog/series/${slug}/${chapterSlug(c)}`}
+                  class="block py-1.5 text-sm leading-snug transition-colors"
+                  style={isCurrent ? 'color: var(--accent); font-weight: 600' : 'color: var(--fg-muted)'}
+                >
+                  <span class="mr-1.5 font-mono text-xs">{String(c.data.order).padStart(2, '0')}</span>
+                  {c.data.title}
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+
+        {inPageHeadings.length > 0 && (
+          <>
+            <p class="mt-6 font-mono text-xs uppercase tracking-wider" style="color: var(--fg-muted)">On this page</p>
+            <ol id="toc" class="mt-3 space-y-1 border-l pl-4" style="border-color: var(--border)">
+              {inPageHeadings.map((h) => (
+                <li style={h.depth === 3 ? 'padding-left: 0.75rem' : ''}>
+                  <a
+                    href={`#${h.slug}`}
+                    data-toc-link={h.slug}
+                    class="toc-link block py-1 text-xs leading-snug transition-colors"
+                    style="color: var(--fg-muted)"
+                  >
+                    {h.text}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+      </div>
+    </aside>
+
+    <!-- Chapter content -->
+    <article class="min-w-0">
+      <a href={`/blog/series/${slug}`} class="text-sm transition-colors hover:underline lg:hidden" style="color: var(--fg-muted)">
+        &larr; {series.data.title}
+      </a>
+
+      <header class="mt-4 border-b pb-8 lg:mt-0" style="border-color: var(--border)">
+        <div class="flex flex-wrap items-center gap-3 text-xs" style="color: var(--fg-muted)">
+          <span class="rounded-full border px-2 py-0.5 font-mono" style="border-color: var(--border)">
+            chapter {chapter.data.order}
+          </span>
+          <span>&middot;</span>
+          <time datetime={chapter.data.date.toISOString()}>{formattedDate}</time>
+          <span>&middot;</span>
+          <span>{readingTime(chapter.body ?? '')} min read</span>
+        </div>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl" style="color: var(--fg)">
+          {chapter.data.title}
+        </h1>
+      </header>
+
+      <div class="prose prose-neutral mt-10 max-w-none">
+        <Content />
+      </div>
+
+      <nav class="mt-16 grid grid-cols-1 gap-4 border-t pt-8 sm:grid-cols-2" style="border-color: var(--border)">
+        {prev ? (
+          <a href={`/blog/series/${slug}/${chapterSlug(prev)}`} class="rounded-xl border p-5 transition-colors" style="border-color: var(--border)">
+            <p class="text-xs" style="color: var(--fg-muted)">&larr; Previous</p>
+            <p class="mt-1 font-medium" style="color: var(--fg)">{prev.data.title}</p>
+          </a>
+        ) : <div />}
+        {next ? (
+          <a href={`/blog/series/${slug}/${chapterSlug(next)}`} class="rounded-xl border p-5 text-right transition-colors" style="border-color: var(--border)">
+            <p class="text-xs" style="color: var(--fg-muted)">Next &rarr;</p>
+            <p class="mt-1 font-medium" style="color: var(--fg)">{next.data.title}</p>
+          </a>
+        ) : <div />}
+      </nav>
+    </article>
+  </div>
+</Base>
+
+<script>
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.toc-link'));
+  if (links.length) {
+    const headingEls = links
+      .map((link) => document.getElementById(link.dataset.tocLink!))
+      .filter((el): el is HTMLElement => !!el);
+
+    const setActive = (id: string | null) => {
+      for (const link of links) {
+        const active = link.dataset.tocLink === id;
+        link.style.color = active ? 'var(--accent)' : 'var(--fg-muted)';
+        link.style.fontWeight = active ? '600' : '400';
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length > 0) {
+          setActive(visible[0].target.id);
+        }
+      },
+      { rootMargin: '0px 0px -70% 0px', threshold: 0 }
+    );
+
+    headingEls.forEach((el) => observer.observe(el));
+  }
+</script>

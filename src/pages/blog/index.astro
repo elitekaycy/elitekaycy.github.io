@@ -1,0 +1,122 @@
+---
+import Base from '../../layouts/Base.astro';
+import EntryCard from '../../components/EntryCard.astro';
+import { getFeed } from '../../lib/content';
+
+const feed = await getFeed();
+
+const searchData = feed.map((item) => ({
+  title: item.title,
+  excerpt: item.excerpt,
+  tags: item.tags,
+  href: item.href,
+  kind: item.kind,
+  date: item.date.toISOString(),
+  minutes: item.minutes,
+  chapterCount: item.chapterCount ?? null,
+}));
+
+const allTags = [...new Set(feed.flatMap((item) => item.tags))].sort();
+---
+
+<Base title="Blog" description="Writing on trading systems, backend engineering, and AI tooling.">
+  <section class="mx-auto max-w-3xl px-6 pt-16 pb-8 sm:px-8 sm:pt-20">
+    <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--fg)">Blog</h1>
+    <p class="mt-3 text-base" style="color: var(--fg-muted)">
+      {feed.length} {feed.length === 1 ? 'entry' : 'entries'} &mdash; posts and series, all in one place.
+    </p>
+
+    <div class="mt-8">
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Search posts, series, tags..."
+        class="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-colors"
+        style="border-color: var(--border); background: var(--bg-subtle); color: var(--fg)"
+        autocomplete="off"
+      />
+    </div>
+
+    {allTags.length > 0 && (
+      <div id="tag-filters" class="mt-4 flex flex-wrap gap-2">
+        <button
+          data-tag=""
+          class="tag-btn rounded-full border px-3 py-1 text-xs font-mono transition-colors"
+          style="border-color: var(--border); color: var(--fg-muted)"
+        >
+          all
+        </button>
+        {allTags.map((tag) => (
+          <button
+            data-tag={tag}
+            class="tag-btn rounded-full border px-3 py-1 text-xs font-mono transition-colors"
+            style="border-color: var(--border); color: var(--fg-muted)"
+          >
+            {tag}
+          </button>
+        ))}
+      </div>
+    )}
+  </section>
+
+  <section class="mx-auto max-w-3xl px-6 pb-24 sm:px-8">
+    <div id="results" class="grid gap-4">
+      {feed.map((item) => <EntryCard item={item} />)}
+    </div>
+    <p id="empty-state" class="hidden py-16 text-center text-sm" style="color: var(--fg-muted)">
+      No entries match your search.
+    </p>
+  </section>
+</Base>
+
+<script define:vars={{ searchData }}>
+  import('fuse.js').then(({ default: Fuse }) => {
+    const fuse = new Fuse(searchData, {
+      keys: ['title', 'excerpt', 'tags'],
+      threshold: 0.35,
+      ignoreLocation: true,
+    });
+
+    const input = document.getElementById('search-input');
+    const resultsEl = document.getElementById('results');
+    const emptyState = document.getElementById('empty-state');
+    const cards = Array.from(resultsEl.children);
+    const tagButtons = Array.from(document.querySelectorAll('.tag-btn'));
+
+    let activeTag = '';
+    let query = '';
+
+    function render() {
+      let hrefs = null;
+
+      if (query.trim()) {
+        hrefs = new Set(fuse.search(query).map((r) => r.item.href));
+      }
+
+      let visibleCount = 0;
+      cards.forEach((card, i) => {
+        const item = searchData[i];
+        const matchesQuery = !hrefs || hrefs.has(item.href);
+        const matchesTag = !activeTag || item.tags.includes(activeTag);
+        const visible = matchesQuery && matchesTag;
+        card.classList.toggle('hidden', !visible);
+        if (visible) visibleCount++;
+      });
+
+      emptyState.classList.toggle('hidden', visibleCount > 0);
+    }
+
+    input.addEventListener('input', (e) => {
+      query = e.target.value;
+      render();
+    });
+
+    tagButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeTag = btn.dataset.tag ?? '';
+        tagButtons.forEach((b) => b.classList.toggle('font-semibold', b === btn));
+        render();
+      });
+    });
+  });
+</script>

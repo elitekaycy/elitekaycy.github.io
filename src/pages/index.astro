@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro';
+import EntryCard from '../components/EntryCard.astro';
+import { getFeed } from '../lib/content';
+
+const feed = await getFeed();
+const recent = feed.slice(0, 8);
+---
+
+<Base title="Dickson Anyaele">
+  <section class="mx-auto max-w-3xl px-6 pt-16 pb-12 sm:px-8 sm:pt-24">
+    <p class="font-mono text-sm" style="color: var(--accent)">Hi, I'm Dickson</p>
+    <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl" style="color: var(--fg)">
+      I build backend systems, trading infrastructure, and tools that make agents more capable.
+    </h1>
+    <p class="mt-6 max-w-2xl text-base leading-relaxed sm:text-lg" style="color: var(--fg-muted)">
+      Software engineer working across Java/Kotlin backends, event-driven systems,
+      and AI tooling — currently deep in <code class="rounded border px-1.5 py-0.5 font-mono text-sm" style="border-color: var(--border)">qkt</code>,
+      an event-driven trading engine, and a handful of agentic tooling projects.
+      This site is where I document the journey: how things get built, what
+      broke, what I'd do differently.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a
+        href="https://github.com/elitekaycy"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
+        style="border-color: var(--border); color: var(--fg)"
+      >
+        GitHub &rarr;
+      </a>
+      <a
+        href="https://twitter.com/elitekaycy"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
+        style="border-color: var(--border); color: var(--fg)"
+      >
+        Twitter &rarr;
+      </a>
+      <a
+        href="/blog"
+        class="rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+        style={`background: var(--accent); color: var(--bg)`}
+      >
+        Read the blog &rarr;
+      </a>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-3xl border-t px-6 py-16 sm:px-8" style="border-color: var(--border)">
+    <div class="mb-8 flex items-baseline justify-between">
+      <h2 class="text-lg font-semibold" style="color: var(--fg)">Recent writing</h2>
+      <a href="/blog" class="text-sm transition-colors hover:underline" style="color: var(--fg-muted)">
+        View all &rarr;
+      </a>
+    </div>
+    <div class="grid gap-4">
+      {recent.map((item) => <EntryCard item={item} />)}
+    </div>
+  </section>
+</Base>
