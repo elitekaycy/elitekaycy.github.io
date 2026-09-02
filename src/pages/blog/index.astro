@@ -10,113 +10,208 @@ const searchData = feed.map((item) => ({
   excerpt: item.excerpt,
   tags: item.tags,
   href: item.href,
-  kind: item.kind,
-  date: item.date.toISOString(),
-  minutes: item.minutes,
-  chapterCount: item.chapterCount ?? null,
 }));
 
 const allTags = [...new Set(feed.flatMap((item) => item.tags))].sort();
 ---
 
-<Base title="Blog" description="Writing on trading systems, backend engineering, and AI tooling.">
-  <section class="mx-auto max-w-3xl px-6 pt-16 pb-8 sm:px-8 sm:pt-20">
-    <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--fg)">Blog</h1>
-    <p class="mt-3 text-base" style="color: var(--fg-muted)">
-      {feed.length} {feed.length === 1 ? 'entry' : 'entries'} &mdash; posts and series, all in one place.
+<Base
+  title="Blog"
+  description="Writing on trading systems, backend engineering, and AI tooling."
+>
+  <section class="mx-auto max-w-3xl px-6 pt-14 pb-8 sm:px-8 sm:pt-20">
+    <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Blog</h1>
+    <p class="mt-3 text-base text-muted">
+      Posts and series, all in one place. Search by title, summary, or tag.
     </p>
 
     <div class="mt-8">
-      <input
-        id="search-input"
-        type="text"
-        placeholder="Search posts, series, tags..."
-        class="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-colors"
-        style="border-color: var(--border); background: var(--bg-subtle); color: var(--fg)"
-        autocomplete="off"
-      />
+      <label for="search-input" class="sr-only">Search posts and series</label>
+      <div class="relative">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+          class="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-faint"
+        >
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.5-3.5"></path>
+        </svg>
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search posts, series, tags…"
+          autocomplete="off"
+          class="w-full rounded-lg border border-border bg-surface py-3 pl-11 pr-4 text-sm text-fg transition-colors placeholder:text-faint hover:border-border-strong focus:border-accent focus:outline-none"
+        />
+      </div>
     </div>
 
-    {allTags.length > 0 && (
-      <div id="tag-filters" class="mt-4 flex flex-wrap gap-2">
-        <button
-          data-tag=""
-          class="tag-btn rounded-full border px-3 py-1 text-xs font-mono transition-colors"
-          style="border-color: var(--border); color: var(--fg-muted)"
-        >
-          all
-        </button>
-        {allTags.map((tag) => (
-          <button
-            data-tag={tag}
-            class="tag-btn rounded-full border px-3 py-1 text-xs font-mono transition-colors"
-            style="border-color: var(--border); color: var(--fg-muted)"
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
-    )}
+    {
+      allTags.length > 0 && (
+        <div class="mt-4">
+          <h2 class="sr-only">Filter by tag</h2>
+          <div id="tag-filters" class="flex flex-wrap gap-2" role="group" aria-label="Filter by tag">
+            <button
+              type="button"
+              data-tag=""
+              aria-pressed="true"
+              class="tag-btn rounded-full border border-border px-3 py-1.5 font-mono text-xs transition-colors"
+            >
+              all
+            </button>
+            {allTags.map((tag) => (
+              <button
+                type="button"
+                data-tag={tag}
+                aria-pressed="false"
+                class="tag-btn rounded-full border border-border px-3 py-1.5 font-mono text-xs transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    <!-- Result count, announced to screen readers as the filters change. -->
+    <p
+      id="result-count"
+      role="status"
+      aria-live="polite"
+      class="mt-6 text-sm text-faint"
+    >
+      {`${feed.length} ${feed.length === 1 ? 'entry' : 'entries'}`}
+    </p>
   </section>
 
-  <section class="mx-auto max-w-3xl px-6 pb-24 sm:px-8">
-    <div id="results" class="grid gap-4">
-      {feed.map((item) => <EntryCard item={item} />)}
-    </div>
-    <p id="empty-state" class="hidden py-16 text-center text-sm" style="color: var(--fg-muted)">
-      No entries match your search.
+  <section class="mx-auto max-w-3xl px-6 pb-24 sm:px-8" aria-label="Results">
+    <ul id="results" class="grid gap-4">
+      {feed.map((item) => <li><EntryCard item={item} /></li>)}
+    </ul>
+    <p id="empty-state" hidden class="rounded-xl border border-dashed border-border px-6 py-16 text-center text-sm text-muted">
+      No entries match that search. Try a different term, or
+      <button type="button" id="clear-filters" class="inline-link bg-transparent">
+        clear the filters</button
+      >.
     </p>
+
+    <script
+      id="search-data"
+      type="application/json"
+      is:inline
+      set:html={JSON.stringify(searchData)}
+    />
   </section>
 </Base>
 
-<script define:vars={{ searchData }}>
-  import('fuse.js').then(({ default: Fuse }) => {
-    const fuse = new Fuse(searchData, {
-      keys: ['title', 'excerpt', 'tags'],
-      threshold: 0.35,
-      ignoreLocation: true,
+<style>
+  /* Tag pills: pressed state is carried by weight + fill + border, not color
+     alone, so the active filter is unambiguous in either theme. */
+  .tag-btn {
+    color: var(--muted);
+  }
+  .tag-btn:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-hover);
+    color: var(--fg);
+  }
+  .tag-btn[aria-pressed='true'] {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--bg);
+    font-weight: 600;
+  }
+</style>
+
+<script>
+  import Fuse from 'fuse.js';
+
+  type SearchItem = { title: string; excerpt: string; tags: string[]; href: string };
+
+  const dataEl = document.getElementById('search-data');
+  const searchData: SearchItem[] = JSON.parse(dataEl?.textContent ?? '[]');
+
+  const fuse = new Fuse(searchData, {
+    keys: [
+      { name: 'title', weight: 3 },
+      { name: 'tags', weight: 2 },
+      { name: 'excerpt', weight: 1 },
+    ],
+    threshold: 0.35,
+    ignoreLocation: true,
+  });
+
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const resultsEl = document.getElementById('results')!;
+  const emptyState = document.getElementById('empty-state')!;
+  const countEl = document.getElementById('result-count')!;
+  const clearBtn = document.getElementById('clear-filters');
+  const cards = Array.from(resultsEl.children) as HTMLElement[];
+  const tagButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.tag-btn')
+  );
+
+  let activeTag = '';
+  let query = '';
+
+  function render() {
+    const matched = query.trim()
+      ? new Set(fuse.search(query).map((r) => r.item.href))
+      : null;
+
+    let visible = 0;
+    cards.forEach((card, i) => {
+      const item = searchData[i];
+      const show =
+        (!matched || matched.has(item.href)) &&
+        (!activeTag || item.tags.includes(activeTag));
+      card.hidden = !show;
+      if (show) visible++;
     });
 
-    const input = document.getElementById('search-input');
-    const resultsEl = document.getElementById('results');
-    const emptyState = document.getElementById('empty-state');
-    const cards = Array.from(resultsEl.children);
-    const tagButtons = Array.from(document.querySelectorAll('.tag-btn'));
+    emptyState.hidden = visible > 0;
+    countEl.textContent = `${visible} ${visible === 1 ? 'entry' : 'entries'}`;
+  }
 
-    let activeTag = '';
-    let query = '';
+  // Debounced so the live region isn't announced on every keystroke.
+  let debounce: number;
+  input.addEventListener('input', (e) => {
+    query = (e.target as HTMLInputElement).value;
+    window.clearTimeout(debounce);
+    debounce = window.setTimeout(render, 120);
+  });
 
-    function render() {
-      let hrefs = null;
-
-      if (query.trim()) {
-        hrefs = new Set(fuse.search(query).map((r) => r.item.href));
-      }
-
-      let visibleCount = 0;
-      cards.forEach((card, i) => {
-        const item = searchData[i];
-        const matchesQuery = !hrefs || hrefs.has(item.href);
-        const matchesTag = !activeTag || item.tags.includes(activeTag);
-        const visible = matchesQuery && matchesTag;
-        card.classList.toggle('hidden', !visible);
-        if (visible) visibleCount++;
-      });
-
-      emptyState.classList.toggle('hidden', visibleCount > 0);
+  // Escape clears the search box, matching standard search-field behavior.
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      input.value = '';
+      query = '';
+      render();
     }
+  });
 
-    input.addEventListener('input', (e) => {
-      query = e.target.value;
+  tagButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeTag = btn.dataset.tag ?? '';
+      tagButtons.forEach((b) =>
+        b.setAttribute('aria-pressed', String(b === btn))
+      );
       render();
     });
+  });
 
-    tagButtons.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeTag = btn.dataset.tag ?? '';
-        tagButtons.forEach((b) => b.classList.toggle('font-semibold', b === btn));
-        render();
-      });
-    });
+  clearBtn?.addEventListener('click', () => {
+    input.value = '';
+    query = '';
+    activeTag = '';
+    tagButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === 0)));
+    render();
+    input.focus();
   });
 </script>

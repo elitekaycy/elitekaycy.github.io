@@ -75,3 +75,40 @@ export async function getFeed(): Promise<FeedItem[]> {
 
   return [...postItems, ...seriesItems].sort((a, b) => b.date.valueOf() - a.date.valueOf());
 }
+
+/**
+ * Items for the RSS feed. Unlike the on-site feed, this lists every chapter
+ * individually — a subscriber should hear about a new chapter, not just about
+ * the series the first time it appears.
+ */
+export async function getRssItems() {
+  const [posts, series] = await Promise.all([getPublishedPosts(), getPublishedSeries()]);
+
+  const postItems = posts.map((p) => ({
+    title: p.data.title,
+    description: p.data.excerpt,
+    pubDate: p.data.date,
+    link: `/blog/posts/${p.id}`,
+    categories: p.data.tags,
+  }));
+
+  const chapterItems = (
+    await Promise.all(
+      series.map(async (s) => {
+        const slug = seriesSlug(s);
+        const chapters = await getChaptersForSeries(slug);
+        return chapters.map((c) => ({
+          title: `${s.data.title} — ${c.data.title}`,
+          description: c.data.excerpt,
+          pubDate: c.data.date,
+          link: `/blog/series/${slug}/${chapterSlug(c)}`,
+          categories: s.data.tags,
+        }));
+      })
+    )
+  ).flat();
+
+  return [...postItems, ...chapterItems].sort(
+    (a, b) => b.pubDate.valueOf() - a.pubDate.valueOf()
+  );
+}

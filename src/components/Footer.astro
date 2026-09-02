@@ -1,14 +1,32 @@
 ---
 const year = new Date().getFullYear();
+
+const links = [
+  { href: 'https://github.com/elitekaycy', label: 'GitHub', external: true },
+  { href: 'https://twitter.com/elitekaycy', label: 'Twitter', external: true },
+  { href: '/rss.xml', label: 'RSS', external: false },
+];
 ---
 
-<footer class="border-t" style="border-color: var(--border)">
-  <div class="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8" style="color: var(--fg-muted)">
-    <p>&copy; {year} Dickson Anyaele</p>
-    <div class="flex gap-5">
-      <a href="https://github.com/elitekaycy" target="_blank" rel="noopener noreferrer" class="transition-colors hover:underline">GitHub</a>
-      <a href="https://twitter.com/elitekaycy" target="_blank" rel="noopener noreferrer" class="transition-colors hover:underline">Twitter</a>
-      <a href="/rss.xml" class="transition-colors hover:underline">RSS</a>
-    </div>
+<footer class="mt-8 border-t border-border">
+  <div
+    class="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"
+  >
+    <p class="text-faint">&copy; {year} Dickson Anyaele</p>
+    <nav aria-label="Social and feed links" class="flex flex-wrap gap-1">
+      {
+        links.map((link) => (
+          <a
+            href={link.href}
+            target={link.external ? '_blank' : undefined}
+            rel={link.external ? 'me noopener noreferrer' : undefined}
+            class="-mx-1 rounded-md px-3 py-2 text-muted underline decoration-transparent underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
+          >
+            {link.label}
+            {link.external && <span class="sr-only">(opens in a new tab)</span>}
+          </a>
+        ))
+      }
+    </nav>
   </div>
 </footer>

@@ -1,15 +1,45 @@
+---
+// Theme toggle. Labelled for screen readers, reflects state via aria-pressed,
+// and keeps a 40px hit target (comfortably above the 24px WCAG 2.2 minimum).
+---
+
 <button
   id="theme-toggle"
-  aria-label="Toggle color theme"
-  class="grid h-8 w-8 place-items-center rounded-md border transition-colors"
-  style="border-color: var(--border); color: var(--fg-muted)"
+  type="button"
+  aria-label="Switch to dark theme"
+  aria-pressed="false"
+  title="Switch theme"
+  class="ml-1 grid size-10 place-items-center rounded-md border border-border text-muted transition-colors hover:border-border-strong hover:bg-surface-hover hover:text-fg active:scale-95"
 >
-  <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="hidden h-4 w-4">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+  <svg
+    id="icon-sun"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    aria-hidden="true"
+    class="hidden size-[1.05rem]"
+  >
+    <circle cx="12" cy="12" r="4"></circle>
+    <path
+      d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+    ></path>
   </svg>
-  <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="hidden h-4 w-4">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+  <svg
+    id="icon-moon"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+    class="hidden size-[1.05rem]"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>
   </svg>
 </button>
 
@@ -20,18 +50,23 @@
     const sun = document.getElementById('icon-sun');
     const moon = document.getElementById('icon-moon');
 
-    function isDark() {
+    const isDark = () => {
       const attr = root.getAttribute('data-theme');
       if (attr === 'dark') return true;
       if (attr === 'light') return false;
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
+    };
 
     function sync() {
       const dark = isDark();
-      // icon shown = the mode a click will switch TO
+      // The icon shows the mode a click switches TO.
       sun.classList.toggle('hidden', !dark);
       moon.classList.toggle('hidden', dark);
+      btn.setAttribute('aria-pressed', String(dark));
+      btn.setAttribute(
+        'aria-label',
+        dark ? 'Switch to light theme' : 'Switch to dark theme'
+      );
     }
 
     sync();
@@ -42,5 +77,12 @@
       localStorage.setItem('theme', next);
       sync();
     });
+
+    // Follow the OS if the user has never made an explicit choice.
+    window
+      .matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', () => {
+        if (!localStorage.getItem('theme')) sync();
+      });
   })();
 </script>

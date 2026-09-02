@@ -29,7 +29,11 @@ export async function getStaticPaths() {
 const { series, chapter, chapters } = Astro.props;
 const slug = seriesSlug(series);
 const { Content, headings } = await render(chapter);
-const inPageHeadings = headings.filter((h) => h.depth <= 3);
+// The autolink plugin appends a "#" text node to each heading, which lands in
+// the collected heading text — strip it so the TOC reads cleanly.
+const inPageHeadings = headings
+  .filter((h) => h.depth <= 3)
+  .map((h) => ({ ...h, text: h.text.replace(/#\s*$/, '').trim() }));
 
 const currentSlug = chapterSlug(chapter);
 const currentIndex = chapters.findIndex((c) => chapterSlug(c) === currentSlug);
@@ -43,99 +47,247 @@ const formattedDate = chapter.data.date.toLocaleDateString('en-US', {
 });
 ---
 
-<Base title={`${chapter.data.title} — ${series.data.title}`} description={chapter.data.excerpt}>
-  <div class="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:grid lg:grid-cols-[240px_1fr] lg:gap-12">
-    <!-- Floating chapter sidebar -->
-    <aside class="hidden lg:block">
-      <div class="sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto pb-8">
-        <a href={`/blog/series/${slug}`} class="text-xs transition-colors hover:underline" style="color: var(--fg-muted)">
-          &larr; {series.data.title}
-        </a>
-        <ol class="mt-4 space-y-1 border-l pl-4" style="border-color: var(--border)">
-          {chapters.map((c) => {
-            const isCurrent = chapterSlug(c) === currentSlug;
-            return (
-              <li>
-                <a
-                  href={`/blog/series/${slug}/${chapterSlug(c)}`}
-                  class="block py-1.5 text-sm leading-snug transition-colors"
-                  style={isCurrent ? 'color: var(--accent); font-weight: 600' : 'color: var(--fg-muted)'}
-                >
-                  <span class="mr-1.5 font-mono text-xs">{String(c.data.order).padStart(2, '0')}</span>
-                  {c.data.title}
-                </a>
-              </li>
-            );
-          })}
-        </ol>
+<Base
+  title={`${chapter.data.title} — ${series.data.title}`}
+  description={chapter.data.excerpt}
+>
+  <!-- Reading progress: ambient feedback on "how much is left" for long reads. -->
+  <div
+    class="sticky top-[3.9rem] z-40 h-0.5 w-full bg-transparent"
+    aria-hidden="true"
+  >
+    <div id="reading-progress" class="h-full w-0 bg-accent transition-[width] duration-75"></div>
+  </div>
 
-        {inPageHeadings.length > 0 && (
-          <>
-            <p class="mt-6 font-mono text-xs uppercase tracking-wider" style="color: var(--fg-muted)">On this page</p>
-            <ol id="toc" class="mt-3 space-y-1 border-l pl-4" style="border-color: var(--border)">
-              {inPageHeadings.map((h) => (
-                <li style={h.depth === 3 ? 'padding-left: 0.75rem' : ''}>
-                  <a
-                    href={`#${h.slug}`}
-                    data-toc-link={h.slug}
-                    class="toc-link block py-1 text-xs leading-snug transition-colors"
-                    style="color: var(--fg-muted)"
-                  >
-                    {h.text}
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </>
-        )}
+  <div class="mx-auto max-w-6xl px-6 py-10 sm:px-8 lg:grid lg:grid-cols-[250px_1fr] lg:gap-14">
+    <!-- Desktop: persistent chapter rail -->
+    <aside class="hidden lg:block" aria-label="Series contents">
+      <div class="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pb-8">
+        <a
+          href={`/blog/series/${slug}`}
+          class="-mx-2 inline-block rounded-md px-2 py-1 text-xs text-muted underline decoration-transparent underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
+        >
+          <span aria-hidden="true">&larr;</span>
+          {series.data.title}
+        </a>
+
+        <nav aria-label="Chapters" class="mt-4">
+          <ol class="space-y-0.5 border-l border-border">
+            {
+              chapters.map((c) => {
+                const isCurrent = chapterSlug(c) === currentSlug;
+                return (
+                  <li>
+                    <a
+                      href={`/blog/series/${slug}/${chapterSlug(c)}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                      class:list={[
+                        '-ml-px block border-l-2 py-1.5 pl-4 text-sm leading-snug transition-colors',
+                        isCurrent
+                          ? 'border-accent font-semibold text-accent'
+                          : 'border-transparent text-muted hover:border-border-strong hover:text-fg',
+                      ]}
+                    >
+                      <span class="mr-1.5 font-mono text-xs tabular-nums">
+                        {String(c.data.order).padStart(2, '0')}
+                      </span>
+                      {c.data.title}
+                    </a>
+                  </li>
+                );
+              })
+            }
+          </ol>
+        </nav>
+
+        {
+          inPageHeadings.length > 0 && (
+            <nav aria-label="On this page" class="mt-8">
+              <p class="font-mono text-[0.6875rem] uppercase tracking-wider text-faint">
+                On this page
+              </p>
+              <ol class="mt-3 space-y-0.5 border-l border-border">
+                {inPageHeadings.map((h) => (
+                  <li>
+                    <a
+                      href={`#${h.slug}`}
+                      data-toc-link={h.slug}
+                      class:list={[
+                        'toc-link -ml-px block border-l-2 border-transparent py-1 pr-2 text-xs leading-snug text-muted transition-colors hover:border-border-strong hover:text-fg',
+                        h.depth === 3 ? 'pl-7' : 'pl-4',
+                      ]}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )
+        }
       </div>
     </aside>
 
-    <!-- Chapter content -->
     <article class="min-w-0">
-      <a href={`/blog/series/${slug}`} class="text-sm transition-colors hover:underline lg:hidden" style="color: var(--fg-muted)">
-        &larr; {series.data.title}
-      </a>
+      <!-- Mobile: collapsible contents, so the rail isn't simply lost below lg -->
+      <div class="lg:hidden">
+        <a
+          href={`/blog/series/${slug}`}
+          class="-mx-2 inline-block rounded-md px-2 py-1 text-sm text-muted underline decoration-transparent underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
+        >
+          <span aria-hidden="true">&larr;</span>
+          {series.data.title}
+        </a>
 
-      <header class="mt-4 border-b pb-8 lg:mt-0" style="border-color: var(--border)">
-        <div class="flex flex-wrap items-center gap-3 text-xs" style="color: var(--fg-muted)">
-          <span class="rounded-full border px-2 py-0.5 font-mono" style="border-color: var(--border)">
+        <details class="group mt-4 rounded-xl border border-border">
+          <summary
+            class="flex list-none items-center justify-between gap-3 rounded-xl px-5 py-3.5 text-sm font-medium transition-colors hover:bg-surface-hover"
+          >
+            <span>
+              Chapter {chapter.data.order} of {chapters.length} &mdash; contents
+            </span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              class="size-4 shrink-0 text-faint transition-transform duration-200 group-open:rotate-180"
+            >
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </summary>
+          <ol class="border-t border-border px-5 py-3">
+            {
+              chapters.map((c) => {
+                const isCurrent = chapterSlug(c) === currentSlug;
+                return (
+                  <li>
+                    <a
+                      href={`/blog/series/${slug}/${chapterSlug(c)}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                      class:list={[
+                        'block py-2 text-sm',
+                        isCurrent ? 'font-semibold text-accent' : 'text-muted',
+                      ]}
+                    >
+                      <span class="mr-1.5 font-mono text-xs tabular-nums">
+                        {String(c.data.order).padStart(2, '0')}
+                      </span>
+                      {c.data.title}
+                    </a>
+                  </li>
+                );
+              })
+            }
+          </ol>
+        </details>
+      </div>
+
+      <header class="mt-8 border-b border-border pb-8 lg:mt-0">
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 text-xs text-faint">
+          <span
+            class="rounded-full border border-border bg-surface px-2.5 py-0.5 font-mono font-medium text-muted"
+          >
             chapter {chapter.data.order}
           </span>
-          <span>&middot;</span>
+          <span aria-hidden="true">&middot;</span>
           <time datetime={chapter.data.date.toISOString()}>{formattedDate}</time>
-          <span>&middot;</span>
+          <span aria-hidden="true">&middot;</span>
           <span>{readingTime(chapter.body ?? '')} min read</span>
         </div>
-        <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl" style="color: var(--fg)">
+        <h1
+          class="mt-4 text-balance text-3xl font-semibold leading-tight tracking-tight sm:text-[2.5rem]"
+        >
           {chapter.data.title}
         </h1>
       </header>
 
-      <div class="prose prose-neutral mt-10 max-w-none">
+      <div class="prose mt-10">
         <Content />
       </div>
 
-      <nav class="mt-16 grid grid-cols-1 gap-4 border-t pt-8 sm:grid-cols-2" style="border-color: var(--border)">
-        {prev ? (
-          <a href={`/blog/series/${slug}/${chapterSlug(prev)}`} class="rounded-xl border p-5 transition-colors" style="border-color: var(--border)">
-            <p class="text-xs" style="color: var(--fg-muted)">&larr; Previous</p>
-            <p class="mt-1 font-medium" style="color: var(--fg)">{prev.data.title}</p>
-          </a>
-        ) : <div />}
-        {next ? (
-          <a href={`/blog/series/${slug}/${chapterSlug(next)}`} class="rounded-xl border p-5 text-right transition-colors" style="border-color: var(--border)">
-            <p class="text-xs" style="color: var(--fg-muted)">Next &rarr;</p>
-            <p class="mt-1 font-medium" style="color: var(--fg)">{next.data.title}</p>
-          </a>
-        ) : <div />}
+      <nav
+        aria-label="Chapter navigation"
+        class="mt-16 grid grid-cols-1 gap-4 border-t border-border pt-8 sm:grid-cols-2"
+      >
+        {
+          prev ? (
+            <a
+              href={`/blog/series/${slug}/${chapterSlug(prev)}`}
+              rel="prev"
+              class="group rounded-xl border border-border p-5 transition-colors hover:border-border-strong hover:bg-surface"
+            >
+              <span class="flex items-center gap-1.5 text-xs text-faint">
+                <span
+                  aria-hidden="true"
+                  class="transition-transform duration-150 group-hover:-translate-x-0.5"
+                >
+                  ←
+                </span>
+                Previous
+              </span>
+              <span class="mt-1.5 block font-medium leading-snug text-fg transition-colors group-hover:text-accent">
+                {prev.data.title}
+              </span>
+            </a>
+          ) : (
+            <div aria-hidden="true" />
+          )
+        }
+        {
+          next ? (
+            <a
+              href={`/blog/series/${slug}/${chapterSlug(next)}`}
+              rel="next"
+              class="group rounded-xl border border-border p-5 text-right transition-colors hover:border-border-strong hover:bg-surface sm:col-start-2"
+            >
+              <span class="flex items-center justify-end gap-1.5 text-xs text-faint">
+                Next
+                <span
+                  aria-hidden="true"
+                  class="transition-transform duration-150 group-hover:translate-x-0.5"
+                >
+                  →
+                </span>
+              </span>
+              <span class="mt-1.5 block font-medium leading-snug text-fg transition-colors group-hover:text-accent">
+                {next.data.title}
+              </span>
+            </a>
+          ) : (
+            <div aria-hidden="true" />
+          )
+        }
       </nav>
     </article>
   </div>
 </Base>
 
 <script>
+  // --- Reading progress ---------------------------------------------------
+  const bar = document.getElementById('reading-progress');
+  const article = document.querySelector('article');
+
+  if (bar && article) {
+    const update = () => {
+      const start = article.offsetTop;
+      const total = article.offsetHeight - window.innerHeight;
+      const passed = window.scrollY - start;
+      const pct = total > 0 ? Math.min(100, Math.max(0, (passed / total) * 100)) : 0;
+      bar.style.width = `${pct}%`;
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update, { passive: true });
+  }
+
+  // --- Scroll-spy for the "On this page" rail -----------------------------
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.toc-link'));
+
   if (links.length) {
     const headingEls = links
       .map((link) => document.getElementById(link.dataset.tocLink!))
@@ -143,20 +295,28 @@ const formattedDate = chapter.data.date.toLocaleDateString('en-US', {
 
     const setActive = (id: string | null) => {
       for (const link of links) {
-        const active = link.dataset.tocLink === id;
-        link.style.color = active ? 'var(--accent)' : 'var(--fg-muted)';
-        link.style.fontWeight = active ? '600' : '400';
+        const on = link.dataset.tocLink === id;
+        link.classList.toggle('border-accent', on);
+        link.classList.toggle('text-accent', on);
+        link.classList.toggle('font-semibold', on);
+        link.classList.toggle('border-transparent', !on);
+        link.classList.toggle('text-muted', !on);
+        if (on) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
       }
     };
 
+    // Track which headings are above the reading line; the last one wins.
+    const seen = new Map<string, boolean>();
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          setActive(visible[0].target.id);
+        for (const entry of entries) {
+          seen.set(entry.target.id, entry.isIntersecting);
         }
+        const firstVisible = headingEls.find((el) => seen.get(el.id));
+        if (firstVisible) setActive(firstVisible.id);
       },
-      { rootMargin: '0px 0px -70% 0px', threshold: 0 }
+      { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
     );
 
     headingEls.forEach((el) => observer.observe(el));

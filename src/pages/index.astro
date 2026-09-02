@@ -5,59 +5,149 @@ import { getFeed } from '../lib/content';
 
 const feed = await getFeed();
 const recent = feed.slice(0, 8);
+
+const projects = [
+  {
+    name: 'qkt',
+    href: 'https://github.com/elitekaycy/qkt',
+    blurb: 'Event-driven trading engine in Kotlin — SQL-like strategy DSL, deterministic backtests, same code live.',
+  },
+  {
+    name: 'qkt-insights',
+    href: 'https://github.com/elitekaycy/qkt-insights',
+    blurb: 'Analysis and reporting layer over qkt runs.',
+  },
+  {
+    name: 'mt5-gateway',
+    href: 'https://github.com/elitekaycy/mt5-gateway',
+    blurb: 'Headless REST API for MetaTrader 5 — the real terminal under Wine in Docker, no GUI.',
+  },
+  {
+    name: 'qkt-guardrails',
+    href: 'https://github.com/elitekaycy/qkt-guardrails',
+    blurb: 'Engine-independent equity watchdog for prop-firm and live MT5 accounts.',
+  },
+];
 ---
 
 <Base title="Dickson Anyaele">
-  <section class="mx-auto max-w-3xl px-6 pt-16 pb-12 sm:px-8 sm:pt-24">
-    <p class="font-mono text-sm" style="color: var(--accent)">Hi, I'm Dickson</p>
-    <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl" style="color: var(--fg)">
-      I build backend systems, trading infrastructure, and tools that make agents more capable.
+  <section class="mx-auto max-w-3xl px-6 pt-16 pb-14 sm:px-8 sm:pt-24">
+    <p class="font-mono text-sm text-accent">Hi, I'm Dickson</p>
+
+    <h1
+      class="mt-4 text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-[2.75rem]"
+    >
+      I build trading systems, backend infrastructure, and tools that make
+      agents more capable.
     </h1>
-    <p class="mt-6 max-w-2xl text-base leading-relaxed sm:text-lg" style="color: var(--fg-muted)">
-      Software engineer working across Java/Kotlin backends, event-driven systems,
-      and AI tooling — currently deep in <code class="rounded border px-1.5 py-0.5 font-mono text-sm" style="border-color: var(--border)">qkt</code>,
-      an event-driven trading engine, and a handful of agentic tooling projects.
-      This site is where I document the journey: how things get built, what
-      broke, what I'd do differently.
+
+    <p class="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted">
+      Software engineer working across Java/Kotlin backends and event-driven
+      systems. Currently deep in <a
+        href="https://github.com/elitekaycy/qkt"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-link font-mono text-[0.95em]">qkt</a
+      >, <a
+        href="https://github.com/elitekaycy/qkt-insights"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-link font-mono text-[0.95em]">qkt-insights</a
+      >, <a
+        href="https://github.com/elitekaycy/mt5-gateway"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-link font-mono text-[0.95em]">mt5-gateway</a
+      >, and <a
+        href="https://github.com/elitekaycy/qkt-guardrails"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-link font-mono text-[0.95em]">qkt-guardrails</a
+      >, plus AI research around trading and markets. This site is where I
+      document the journey: how things get built, what broke, and what I'd do
+      differently.
     </p>
-    <div class="mt-8 flex flex-wrap gap-3">
+
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <a
+        href="/blog"
+        class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-fg transition-colors hover:bg-accent-hover active:scale-[0.98]"
+      >
+        Read the blog <span aria-hidden="true">&rarr;</span>
+      </a>
       <a
         href="https://github.com/elitekaycy"
         target="_blank"
-        rel="noopener noreferrer"
-        class="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
-        style="border-color: var(--border); color: var(--fg)"
+        rel="me noopener noreferrer"
+        class="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:border-border-strong hover:bg-surface-hover active:scale-[0.98]"
       >
-        GitHub &rarr;
+        GitHub <span class="sr-only">(opens in a new tab)</span>
+        <span aria-hidden="true">&rarr;</span>
       </a>
       <a
         href="https://twitter.com/elitekaycy"
         target="_blank"
-        rel="noopener noreferrer"
-        class="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
-        style="border-color: var(--border); color: var(--fg)"
+        rel="me noopener noreferrer"
+        class="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:border-border-strong hover:bg-surface-hover active:scale-[0.98]"
       >
-        Twitter &rarr;
-      </a>
-      <a
-        href="/blog"
-        class="rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
-        style={`background: var(--accent); color: var(--bg)`}
-      >
-        Read the blog &rarr;
+        Twitter <span class="sr-only">(opens in a new tab)</span>
+        <span aria-hidden="true">&rarr;</span>
       </a>
     </div>
   </section>
 
-  <section class="mx-auto max-w-3xl border-t px-6 py-16 sm:px-8" style="border-color: var(--border)">
-    <div class="mb-8 flex items-baseline justify-between">
-      <h2 class="text-lg font-semibold" style="color: var(--fg)">Recent writing</h2>
-      <a href="/blog" class="text-sm transition-colors hover:underline" style="color: var(--fg-muted)">
-        View all &rarr;
+  <section
+    aria-labelledby="projects-heading"
+    class="mx-auto max-w-3xl border-t border-border px-6 py-14 sm:px-8"
+  >
+    <h2 id="projects-heading" class="text-lg font-semibold tracking-tight">
+      What I'm building
+    </h2>
+    <ul class="mt-6 grid gap-3 sm:grid-cols-2">
+      {
+        projects.map((project) => (
+          <li>
+            <a
+              href={project.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="group flex h-full flex-col rounded-xl border border-border p-5 transition-colors hover:border-border-strong hover:bg-surface"
+            >
+              <span class="flex items-center gap-1.5 font-mono text-sm font-semibold text-fg">
+                {project.name}
+                <span
+                  aria-hidden="true"
+                  class="text-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent"
+                >
+                  ↗
+                </span>
+                <span class="sr-only">(opens in a new tab)</span>
+              </span>
+              <span class="mt-2 text-sm leading-relaxed text-muted">{project.blurb}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section
+    aria-labelledby="recent-heading"
+    class="mx-auto max-w-3xl border-t border-border px-6 py-14 sm:px-8"
+  >
+    <div class="mb-7 flex items-baseline justify-between gap-4">
+      <h2 id="recent-heading" class="text-lg font-semibold tracking-tight">
+        Recent writing
+      </h2>
+      <a
+        href="/blog"
+        class="-mx-2 rounded-md px-2 py-1 text-sm text-muted underline decoration-transparent underline-offset-4 transition-colors hover:text-fg hover:decoration-current"
+      >
+        View all <span aria-hidden="true">&rarr;</span>
       </a>
     </div>
-    <div class="grid gap-4">
-      {recent.map((item) => <EntryCard item={item} />)}
-    </div>
+    <ul class="grid gap-4">
+      {recent.map((item) => <li><EntryCard item={item} /></li>)}
+    </ul>
   </section>
 </Base>
