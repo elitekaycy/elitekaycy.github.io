@@ -6,6 +6,7 @@ import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeCallouts from './src/lib/rehype-callouts.mjs';
 import rehypeTerms from './src/lib/rehype-terms.mjs';
+import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
 
 // https://astro.build/config
 export default defineConfig({
@@ -27,6 +28,7 @@ export default defineConfig({
       rehypeSlug,
       rehypeCallouts,
       rehypeTerms,
+      rehypeExternalLinks,
       [
         rehypeAutolinkHeadings,
         {

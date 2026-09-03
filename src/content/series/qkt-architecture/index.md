@@ -50,8 +50,15 @@ parts:
 
 A chapter-by-chapter walkthrough of trading systems in general, and `qkt` — an
 event-driven trading engine written in Kotlin — as the running, real-code
-example. Each chapter shows real code, weighs the tradeoff space against what
-else could have been built, and explains why the actual design won.
+example. Each chapter shows the actual source, explains why the design is
+shaped the way it is, and states plainly what that choice cost.
+
+The engine is open source, so none of this has to be taken on trust: the
+[source is on GitHub](https://github.com/elitekaycy/qkt) and the
+[reference documentation](https://elitekaycy.github.io/qkt/) covers the
+strategy DSL, the CLI, and how to run it yourself. Every command output in
+this series is real — captured from that tool, against a dataset you can
+reproduce.
 
 This is a book in progress, written the way it's meant to be read: in order,
 front to back.
