@@ -1,6 +1,6 @@
 ---
 title: "qkt — Architecture Notes"
-excerpt: "A chapter-by-chapter walkthrough of trading systems in general, and qkt — an event-driven trading engine in Kotlin — as the running example."
+excerpt: "My record of building qkt, an event-driven trading engine in Kotlin — the decisions, the tradeoffs behind them, and what it taught me about trading and about building systems."
 date: 2026-06-01
 tags: ["trading", "systems-design", "kotlin"]
 draft: false
@@ -54,3 +54,8 @@ else could have been built, and explains why the actual design won.
 
 This is a book in progress, written the way it's meant to be read: in order,
 front to back.
+
+It's also my own record of the thing: the decisions, the tradeoffs behind them,
+the direction the system took, and what building it taught me about trading and
+about building systems. Enjoy — and hopefully we all learn a thing or two along
+the way.
