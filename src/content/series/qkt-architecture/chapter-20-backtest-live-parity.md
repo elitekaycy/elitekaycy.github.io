@@ -54,13 +54,32 @@ can disagree, and if they can disagree in live they can disagree
 differently in backtest.
 
 **One place per difference.** Where the two worlds genuinely differ, the
-difference lives in a single named seam. The clearest example: for a long
-time the engine compared a *mid* price when deciding whether a trigger
-fired, while a real venue triggers on the bid or the ask. That is roughly
-half a spread of optimism on every single trigger event — small, invisible,
-and applied thousands of times. The fix was not a patch at each call site
-but one function that answers *which side does this execute against*, with
-everything routed through it.
+difference lives in a single named seam. The clearest example is two
+functions and a comment:
+
+```kotlin
+/**
+ * The price a BUY executes at — the ask, falling back to the tick's single price
+ * (mid for quote-driven feeds) when the feed carries no quote depth. Trigger checks
+ * must use this side: MT5 fires BUY_STOP on the ask, so an engine or simulator that
+ * triggers on mid is systematically ~half a spread optimistic per trigger event.
+ */
+fun Tick.buyExecPrice(): BigDecimal = ask ?: price
+
+/** The price a SELL executes at — the bid; see [buyExecPrice]. */
+fun Tick.sellExecPrice(): BigDecimal = bid ?: price
+```
+
+Read the size of that error: **half a spread, on every trigger event.**
+On gold, that is a few cents; over ten thousand triggers it is a
+meaningful fraction of a strategy's edge, and it always points the same
+way — in your favour, in the backtest, and not in real life. It is
+invisible in any single trade and decisive in aggregate.
+
+The fix is not a patch at each call site. It is that there is now exactly
+one place in the system that answers *which side does this execute
+against*, and everything routes through it. Any future code that triggers
+on the wrong side has to go out of its way to do so.
 
 ## What is actually compared
 
@@ -73,17 +92,43 @@ the two runs would prove the runtime is deterministic while quietly
 assuming the compiler is. Compiling twice tests both.
 
 It then drives the identical tick list through a backtest and through a
-live session, and compares trades, positions, realized P&L, rejections and
-halts — as exact structural equality, not a tolerance band. Numbers are
-normalised before comparison so that a difference in decimal *scale*
-(`1.50` versus `1.5`) cannot produce a false mismatch while a difference in
-*value* still does.
+live session, and captures the same five things from each:
+
+```kotlin
+data class Snapshot(
+    val trades: List<TradeState>,
+    val positions: List<PositionState>,
+    val pnl: PnlState,
+    val rejections: List<RejectionState>,
+    val halts: List<HaltState>,
+)
+
+data class Result(val backtest: Snapshot, val live: Snapshot)
+```
+
+And the comparison is one line, with no tolerance in it anywhere:
+
+```kotlin
+assertThat(result.live).isEqualTo(result.backtest)
+```
+
+That is exact structural equality over whole domain objects — not a hash,
+not "within a penny." Note what is in the snapshot besides trades:
+**rejections and halts**. A run where both sides made the same trades but
+one of them rejected an order the other allowed is a *failure*. The
+comparison covers the decisions not to trade as well as the decisions to.
+
+The one concession is that numbers are normalised to a canonical string
+before comparison, so a difference in decimal *scale* — `1.50` against
+`1.5` — cannot produce a false mismatch, while any difference in *value*
+still does.
 
 That covers everything above the broker. For the broker itself there is a
 narrower and more expensive proof: recorded ticks and order submissions
 from a real venue, replayed against the venue simulator, checking that
-acceptance decisions match — retcode included — and that fills agree
-within the instrument's own tolerances.
+acceptance decisions match — down to the venue's own numeric rejection
+code, its *retcode* — and that fills agree within the instrument's own
+tolerances.
 
 ## The claim, stated honestly
 
@@ -161,7 +206,7 @@ That is a different kind of claim from the harness — evidence about one
 build on one day rather than a property of the design — and it is the one
 that actually gates real money.
 
-## What this bought, and what it cost
+## What parity is, and what it is not
 
 What it bought is the thing Chapter 1 said was the whole ballgame: a
 backtest number that is a statement about the system that will actually

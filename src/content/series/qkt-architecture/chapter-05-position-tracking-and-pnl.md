@@ -1,6 +1,6 @@
 ---
 title: "Position Tracking and P&L"
-excerpt: "Say a strategy buys 0.1 lots of gold. A moment later, does it own 0.1 lots of gold? Obviously — that's what a fill means. Now say the same strategy, five minutes later, sells 0.1 lots of gold. Does..."
+excerpt: "The last four chapters built the half of the loop that *observes*: ticks arrive, an event bus orders them, a candle builder compresses them. None of it touches money. A strategy watching all of that..."
 date: 2026-06-29
 order: 5
 draft: false
@@ -8,11 +8,20 @@ draft: false
 
 ## What do you actually own?
 
+The last four chapters built the half of the loop that *observes*: ticks
+arrive, an event bus orders them, a candle builder compresses them. None
+of it touches money. A strategy watching all of that has still not bought
+anything.
+
+This is where that stops. From here to the end of Part II the subject is
+what happens once a decision becomes a position — what you own, what it is
+worth, and who is allowed to say so.
+
 Say a strategy buys 0.1 lots of gold. A moment later, does it own 0.1 lots of gold? Obviously — that's what a fill means. Now say the same strategy, five minutes later, sells 0.1 lots of gold. Does it now own nothing? Or does it own two positions — a long that's still open and a short that's still open, sitting there side by side, each earning or losing money independently until each is separately closed?
 
 The honest answer is: it depends entirely on which broker you're trading with, and that dependency is not a footnote — it changes what "position" even means as a data structure. Some venues **net**: every execution on a symbol folds into one running number, so a buy and an equal sell cancel out and you're flat, full stop. Other venues **hedge**: a long and a short on the same symbol are two entirely separate tickets that coexist, each with its own entry price, its own stop-loss, its own profit or loss, until you close each one by name.
 
-This split isn't arbitrary, and it isn't just a technical curiosity either broker happened to build. US-regulated forex accounts are legally required to net, first-in-first-out — a rule aimed at stopping traders from disguising a losing position by opening an offsetting one instead of just closing it. Retail MT5 accounts outside that jurisdiction very often hedge instead, and traders genuinely want that: imagine running two independent systems on the same instrument — one a breakout system that just went long gold, one a mean-reversion system that just went short gold on the same move. On a netting account those two signals partially or fully cancel into one blended number, and you lose the ability to tell which system is actually working. On a hedging account they're two real, separately-tracked positions, each judged on its own merits. The tradeoff is capital: a hedging account generally has to post margin against both sides (brokers often give a discount for the fact that the combined risk is bounded, but rarely erase it entirely), where a netting account only ever posts margin against the one net exposure. Faster feedback and cleaner attribution, at the cost of tying up more capital — a real decision a trader makes when choosing a broker, not an implementation detail underneath one.
+This split isn't arbitrary, and it isn't just a technical curiosity either broker happened to build. US-regulated forex accounts are legally required to net, first-in-first-out — a rule aimed at stopping traders from disguising a losing position by opening an offsetting one instead of just closing it. Retail MT5 accounts outside that jurisdiction very often hedge instead, and traders genuinely want that: imagine running two independent systems on the same instrument — one a breakout system that just went long gold, one a mean-reversion system that just went short gold on the same move. On a netting account those two signals partially or fully cancel into one blended number, and you lose the ability to tell which system is actually working. On a hedging account they're two real, separately-tracked positions, each judged on its own merits. The tradeoff is capital. **Margin** is the cash a venue makes you set aside to hold a leveraged position — not the cost of the trade, but a deposit held against it while it is open, and released when you close. A hedging account generally has to post margin against both sides (brokers often give a discount for the fact that the combined risk is bounded, but rarely erase it entirely), where a netting account only ever posts margin against the one net exposure. Faster feedback and cleaner attribution, at the cost of tying up more capital — a real decision a trader makes when choosing a broker, not an implementation detail underneath one.
 
 So the position model has to be honest about which world it's in, and it has to know that per venue, because a portfolio can — and does — trade several brokers with different rules at once. If qkt modeled every account as if it netted, a hedging strategy deliberately holding a winning long and a losing short at the same time, on purpose, would be lied to about its own risk the moment the engine collapsed those into one number.
 
@@ -114,12 +123,16 @@ fun resolve(fill: BrokerEvent.OrderFilled): Resolution {
 
 First: the order's own planned intent, if the fill can still be traced back to the order that produced it — the ordinary path, and it survives a restart cleanly because pending orders persist to disk carrying their intent, not just their price and quantity. There's a neat wrinkle here: if an order that opened a leg somehow reports an execution on the *opposite* side, that can only mean one thing — the venue closed that leg out from under the engine (a stop-out, a margin call, anything venue-initiated) — so the resolver reinterprets it as a close of the very leg that order opened, without needing a separate signal to say so.
 
+![The resolver's three questions in order, with the middle one branching by venue mode into three different meanings for the same ticket](/diagrams/chapter-05/what-a-ticket-means.png)
+
+*Figure 5.3 — the precedence, and the branch inside it. Steps 1 and 3 are simple; step 2 is where the same ticket means three different things depending on the venue.*
+
 Second, when the order trail is gone: whether the strategy already owns a leg carrying this fill's venue ticket. A ticket is not always "one position," though — that depends on the venue mode too. On a hedging account a ticket genuinely is one isolated position, whoever it belongs to. On a netting account the PRIMARY leg *is* the venue's one netted position, and it keeps the same ticket across a reversal — so an execution reported against it means "net this in," not "close this leg." Only a STACK or INDEPENDENT leg on a netting account still maps one ticket to one position. The resolver encodes exactly that distinction rather than treating "has a ticket" as a universal rule.
 
 Third, and last: if neither the order nor a known ticket says anything, fall back to the venue's default — hedging opens a fresh independent leg, everything else nets. This is the same decision the planner would have made in advance; the resolver just has to be able to make it live, for the rare fill that genuinely carries no other trace.
 
 ![The five steps from a strategy's decision to a booked leg, decided once and read back rather than guessed](/diagrams/chapter-05/meaning-decided-before-the-fill.png)
-*Figure 5.3 — Intent travels with the order, not around it. Steps 1–2 happen before anything reaches a broker; step 4 only ever reads what step 2 already decided.*
+*Figure 5.4 — Intent travels with the order, not around it. Steps 1–2 happen before anything reaches a broker; step 4 only ever reads what step 2 already decided.*
 
 ## The ledger: one writer, one truth
 
@@ -185,7 +198,7 @@ if (positions is LegExposureProvider) {
 Every open leg contributes its own mark-to-market independently, and the strategy or account figure is the sum of those individual truths — never a shortcut through a blended net quantity that could hide two real, opposite risks behind one deceptively small number.
 
 ![Five days of a locked long and short: the net line stays flat at zero while spread, commission, and swap keep bleeding money underneath it](/diagrams/chapter-05/locked-position-still-bleeds.png)
-*Figure 5.4 — A simulated locked position: 0.1 lot bought and 0.1 lot sold on the same symbol at the same price. The net directional risk really is zero. The cost of holding both legs open is not.*
+*Figure 5.5 — A simulated locked position: 0.1 lot bought and 0.1 lot sold on the same symbol at the same price. The net directional risk really is zero. The cost of holding both legs open is not.*
 
 That `contractSize` multiplier in the middle of the formula is doing real work and deserves its own word. A "lot" in forex and CFD trading is not one unit of the thing you're trading — a standard lot of EUR/USD represents 100,000 units of euros, a lot of gold might represent 100 troy ounces, and every instrument defines its own multiplier. A one-dollar move in the quoted price of gold is not one dollar of profit or loss; it's one dollar times the contract size times however many lots you hold. Skip that multiplier, or get it wrong for one instrument, and every single trade on that symbol is silently mispriced by a fixed, wrong factor — which is why the engine looks the instrument up rather than assuming quantity and price difference alone tell the whole story.
 
@@ -226,11 +239,11 @@ private fun foldAccounted(a: FillAccountedEvent) {
 This is genuinely just publish/subscribe applied to accounting rather than to price ticks — the same pattern the event bus already gave the system, pointed at a new kind of fact. And it buys the same thing it always buys: every subscriber sees the identical, already-computed number, in a fixed order, with the risk-relevant ones (halt evaluation) guaranteed to run before anything that has an external side effect. Nobody downstream re-derives "what happened here" — they're told, once, by the one place authorized to have decided it.
 
 ![One fill, priced once through three steps, then fanned out to five subscribers that never recompute it themselves](/diagrams/chapter-05/priced-once-told-to-everyone.png)
-*Figure 5.5 — `bookExecution` prices a fill exactly once. Every downstream consumer — including the halt check, which runs last on purpose — reads that one number instead of recomputing its own.*
+*Figure 5.6 — `bookExecution` prices a fill exactly once. Every downstream consumer — including the halt check, which runs last on purpose — reads that one number instead of recomputing its own.*
 
 The event also carries a `kind` — an ordinary execution, a **financing accrual** (the overnight swap charge mentioned above, applied even on days the position doesn't trade at all, purely for holding it past the venue's daily rollover), or a reconcile of value the venue realized while the daemon wasn't running to see it happen live. All three still enter through the same fold, so the account's lifetime P&L is honest about money the strategy actually made or lost — but a reconcile of history from before this session correctly counts toward *lifetime* totals without corrupting *today's* loss budget, since a risk rule watching for a bad day shouldn't be tripped by yesterday's outcome arriving late.
 
-## What this bought, and what it cost
+## The price of one true position
 
 Step back and look at the shape of the whole design. A `LegIntent` decided once and carried on the order, rather than reconstructed from scratch at fill time. One ledger with an exhaustive handler for every intent, rather than several mutation paths that each hope to stay consistent with the others. An account view that's derived, never separately written. Realized P&L computed once and fanned out to subscribers, rather than recomputed independently wherever it's needed.
 

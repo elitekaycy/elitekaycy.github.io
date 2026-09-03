@@ -72,7 +72,24 @@ Max drawdown:     0.00000000
 
 Read that Sharpe number again. **434.96.** A real hedge fund would frame a Sharpe of 2 on its office wall — a Sharpe ratio, remember, is just that reward-over-pain number from the last section, annualized. My toy strategy, on a hand-drawn 125-minute price series, is reporting *two hundred times that*, and it isn't a bug. It's the formula working exactly as designed, on exactly the kind of input that formula is dangerous to trust.
 
-The engine's actual computation is the mean of all those per-bar returns, divided by their standard deviation, multiplied by the square root of the annualization factor. For a strategy trading one-minute bars on a 24/7 crypto calendar, that annualization factor is **525,960** — the number of one-minute bars in a year — and its square root alone is about **725**. My actual per-bar "reward over pain" ratio — mean return over standard deviation of returns, before any scaling — was a fairly unremarkable `434.96 ÷ 725 ≈ 0.60`. Nothing about *that* number should alarm anyone. But multiply an ordinary-looking 0.60 by 725, and you get a headline that looks like it belongs to the greatest trading strategy ever built, when what actually happened is: a hand-drawn price series with almost no chop in it produced an almost perfectly smooth equity curve over a couple of hours, and the annualization math extrapolated that couple of hours into a full year with total, unwarranted confidence.
+The engine's actual computation is the mean of all those per-bar returns, divided by their standard deviation, multiplied by the square root of the annualization factor. Every step of that is checkable, so let's check it.
+
+The annualization factor is however many bars fit in a year. On a 24/7 crypto calendar with one-minute bars:
+
+```
+365.25 days × 24 hours × 60 minutes  =  525,960 bars per year
+              √525,960               ≈  725
+```
+
+That square root is the whole trick. Sharpe scales with the *square root* of time — a consequence of returns compounding while their randomness accumulates more slowly — so going from a per-bar figure to a per-year figure multiplies by 725, not by 525,960.
+
+Now run it backwards. If the reported annual figure is 434.96 and the multiplier was 725, then the raw per-bar ratio the strategy actually achieved was:
+
+```
+434.96 ÷ 725  ≈  0.60
+```
+
+**0.60.** That is the real measurement — the mean of the per-bar returns divided by their standard deviation, before anything was scaled. It is an unremarkable number. It describes a strategy whose average bar was modestly positive relative to how much its bars bounced around, over about two hours. Nothing about *that* number should alarm anyone. But multiply an ordinary-looking 0.60 by 725, and you get a headline that looks like it belongs to the greatest trading strategy ever built, when what actually happened is: a hand-drawn price series with almost no chop in it produced an almost perfectly smooth equity curve over a couple of hours, and the annualization math extrapolated that couple of hours into a full year with total, unwarranted confidence.
 
 This is the real lesson, and it's a famous trap for exactly this reason: **Sharpe rewards smoothness, and a short or artificially clean sample is always smoother than reality will turn out to be.** A strategy backtested on too little data, or on unusually quiet conditions, will report a Sharpe that looks incredible — right up until it trades through a real, noisy month and the number collapses. The formula isn't lying. It's answering exactly the question it was asked, and the question was asked of a sample too small to deserve an answer that confident.
 

@@ -203,7 +203,7 @@ qkt detects the combination and warns, which is the best available answer,
 but the warning *is* the fix — there is no way to reconstruct a bid/ask
 spread from four mid prices.
 
-## What this bought, and what it cost
+## An honest fiction
 
 What all this bought is a backtest whose fills are defensible. Every
 intra-bar ambiguity resolves the same way on every run, so results reproduce;

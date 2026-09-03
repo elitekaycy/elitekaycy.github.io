@@ -82,6 +82,30 @@ the restart has one question to answer: do these two agree?
 
 *Figure 19.1 — the reconciliation. Three of the four outcomes are either trivial or a refusal.*
 
+The whole decision is one `when`, and it is worth seeing because the
+branches are the argument:
+
+```kotlin
+return when {
+    brokerPositions.isEmpty() && persisted == null -> Outcome.NothingPersisted
+
+    brokerPositions.isEmpty() && persisted != null -> {
+        log.warn("Reconcile: persisted state for $strategyId/$symbol exists but " +
+                 "broker reports no positions; wiping persisted state")
+        persistor.saveLegBook(strategyId, symbol, LegBook(symbol))
+        Outcome.NothingPersisted
+    }
+
+    brokerPositions.isNotEmpty() && persisted == null ->
+        Outcome.Mismatch(
+            "broker reports ${brokerPositions.size} position(s) for " +
+                "$strategyId/$symbol, no persisted state",
+        )
+
+    else -> attemptAttach(strategyId, symbol, brokerPositions, persisted!!, venueTickets)
+}
+```
+
 Both empty is nothing. Disk has state and the venue has no positions is
 also easy, but for a reason worth noticing — the persisted book is *wiped*,
 because positions that are gone from the venue are gone.
@@ -167,9 +191,25 @@ One structural choice deserves its own mention, because it is what keeps
 all of this safe.
 
 The component that builds flatten orders is deliberately, almost
-aggressively dumb. It takes a leg and produces one opposite-side market
-order carrying the intent to close *that* leg, naming its ticket. It has
-no opinions about whether flattening is a good idea.
+aggressively dumb:
+
+```kotlin
+fun closeLeg(strategyId: String, leg: PositionLeg, id: String, now: Long): OrderRequest.Market =
+    OrderRequest.Market(
+        id = id,
+        symbol = leg.symbol,
+        side = if (leg.side == Side.BUY) Side.SELL else Side.BUY,
+        quantity = leg.quantity,
+        closesTicket = leg.brokerTicket,
+        legIntent = LegIntent.Close(legId = leg.legId, ticket = leg.brokerTicket),
+    )
+```
+
+That is the entire component. It takes a leg and produces one
+opposite-side market order carrying the intent to close *that* leg,
+naming its ticket — Chapter 5's `LegIntent` doing exactly the job it was
+built for. There is no branch in it, no condition, no opinion about
+whether flattening is a good idea.
 
 All the detection machinery — reconciliation, orphan detection, the
 vanished-ticket poller — **reports drift. It never flattens.** Closing a
@@ -182,7 +222,7 @@ positions automatically, and the blast radius of a subtle comparison error
 becomes other people's money. Keeping the two apart means the worst case
 is a wrong report that a human reads.
 
-## What this bought, and what it cost
+## Earning the right to keep trading
 
 What it bought is that a restart is an ordinary event. The engine comes
 back, establishes what it actually owns, retires what closed while it was

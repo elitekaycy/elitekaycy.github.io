@@ -171,7 +171,7 @@ top of the chapter: coverage is keyed on one thing and fetch history on
 another, and a hand-placed file satisfies the first without appearing in
 the second.
 
-## What this bought, and what it cost
+## Refusing to run, and what that costs
 
 What it bought is that a backtest either runs on data the system can
 account for, or does not run. Chapters 9 and 10 spent their length on ways

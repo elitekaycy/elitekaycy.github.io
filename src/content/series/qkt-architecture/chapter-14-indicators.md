@@ -26,13 +26,41 @@ at the same time?
 ## An answer, or the absence of one
 
 Start with the smallest piece. Every indicator in qkt exposes the same
-tiny surface: feed it an input, ask it for a value, ask whether it is
-ready.
+tiny surface — and it is split in two, which is the first thing worth
+noticing:
 
-The interesting part is the return type — the value is allowed to be
-**absent**, and the source says exactly how to treat that: *"`null` from
-`value` means 'not yet computable'... Callers should treat null as a hard
-'skip this bar' rather than coalescing to zero."*
+```kotlin
+interface IndicatorOutput {
+    /** Latest computed value, or `null` until [isReady] is true. */
+    fun value(): BigDecimal?
+
+    /** True once the indicator has received at least [warmupBars] samples. */
+    val isReady: Boolean
+
+    /** Number of inputs the indicator must observe before [value] returns non-null. */
+    val warmupBars: Int
+}
+
+interface Indicator<TIn> : IndicatorOutput {
+    /** Feed one input to the indicator. Effects on [value] / [isReady] are immediate. */
+    fun update(input: TIn)
+}
+```
+
+A strategy only ever sees the top half — the *read* side. Only the engine's
+binding layer holds the `update` half and pushes values in. A strategy
+cannot feed an indicator, which means it cannot accidentally advance one
+twice or feed it out of order.
+
+Now the return type, which is the interesting part: the value is allowed
+to be **absent**. `value()` returns `BigDecimal?`, and the source says
+exactly how to treat that — *"`null` from `value` means 'not yet
+computable'... Callers should treat null as a hard 'skip this bar' rather
+than coalescing to zero."*
+
+And notice `warmupBars` sitting right there on the interface. That is the
+number Chapter 13's compiler collects when it walks a strategy: the
+indicator is *asked*, because only the indicator knows.
 
 That instruction is the same discipline Chapter 7 spent a whole chapter
 on, arriving in a new place. An average of three bars when twenty-one are
@@ -189,7 +217,7 @@ arises. Its first aligned window only establishes the baseline, so the
 first real value lands on the second window — a one-window warmup built
 into the maths rather than configured.
 
-## What this bought, and what it cost
+## Right, absent, and never approximately right
 
 What the indicator layer bought is that a number a rule reads is either
 right or absent. It is never approximately right, never a partially-seeded

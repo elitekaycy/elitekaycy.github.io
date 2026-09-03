@@ -34,12 +34,37 @@ interesting decisions in this chapter are all on that seam.
 ## A narrow interface with honest holes
 
 The first decision is what a broker is required to be able to do, and the
-answer is: almost nothing. Submit an order. Cancel one. Optionally modify.
+answer is: almost nothing.
 
-That is deliberately small, because the engine already owns everything
-around it — order management, position tracking, P&L attribution, risk.
-A broker is not asked to be a trading system. It is asked to be a mouth
-and an ear.
+```kotlin
+interface Broker {
+    val name: String
+
+    fun submit(request: OrderRequest): SubmitAck
+
+    /** Cancels the working order with client-assigned [orderId]. No-op if already terminal. */
+    fun cancel(orderId: String)
+
+    fun modify(orderId: String, changes: OrderModification): SubmitAck =
+        throw UnsupportedOperationException("$name does not support modify")
+
+    val supportsPositionTickets: Boolean get() = false
+
+    fun capabilitiesFor(symbol: String): Set<OrderTypeCapability> = capabilities
+}
+```
+
+Submit, cancel, and a name. That is the required surface. It is
+deliberately small because the engine already owns everything around it —
+order management, position tracking, P&L attribution, risk. A broker is
+not asked to be a trading system. It is asked to be a mouth and an ear.
+
+Look at what the optional parts do when a venue lacks them. `modify`
+**throws by default**, naming the broker. `supportsPositionTickets`
+defaults to `false`. Neither one quietly returns something plausible.
+That is the design's whole character in two default implementations:
+a venue that cannot do a thing says so, in a way the caller cannot
+mistake for success.
 
 Everything beyond the minimum is optional, and this is where the design
 gets careful. An optional capability does not silently return a plausible
@@ -61,7 +86,21 @@ not have.
 Now the mechanism that makes one bracket work on two incompatible venues.
 
 Before deciding *how* to send a shape, the engine asks what the venue can
-actually do — and it asks **per symbol**, not per broker.
+actually do. The vocabulary of that question is a closed set:
+
+```kotlin
+enum class OrderTypeCapability {
+    MARKET, LIMIT, STOP, STOP_LIMIT, BRACKET, IF_TOUCHED,
+    MODIFY, OCO, TRAILING_STOP,
+    MULTI_POSITION_PER_SYMBOL, POSITION_MODIFY,
+}
+```
+
+Note `MULTI_POSITION_PER_SYMBOL` in that list — that is Chapter 5's
+hedging-versus-netting distinction, arriving here as a thing the engine
+must *ask about* rather than assume.
+
+And it asks **per symbol**, not per broker.
 
 ![One bracket order fanning to two venues: one that attaches the stop and target natively, one where the engine decomposes it into children it manages itself](/diagrams/chapter-17/one-bracket-two-venues.png)
 
@@ -160,7 +199,7 @@ silently-partial snapshot concludes it is flat on that venue and starts
 trading on that belief. A partial truth presented as a whole one is worse
 than an error.
 
-## What this bought, and what it cost
+## Absorbing the differences, and carrying them
 
 What it bought is that Chapter 12's strategy file means the same thing on
 every venue qkt supports, without pretending the venues are the same. The

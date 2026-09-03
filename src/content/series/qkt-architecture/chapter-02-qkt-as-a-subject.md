@@ -156,35 +156,26 @@ across three branches.**
 
 *Figure 2.2 — one direction only. Code enters at the left and can only move right, and each gate is a different kind of check: fast tests, then the slow integration suite, then a human holding a piece of evidence.*
 
-`dev` is where every change lands first, through a reviewed pull request,
-and the fast checks — build and tests, on Linux and on Windows — have to be
-green. `testing` never receives a human commit: every green push to `dev`
-triggers a job that merges it into `testing` as a promotion commit, and
-`testing` then runs the slower integration suite and builds the container
-image the live bots actually pull. `main`, the release branch that version
-tags are cut from, is stricter still: it only receives a *promotion pull
-request*, and that request can only be opened once a paper-soak run — a
-supervised, hours-long run of the exact `testing` build against a demo
-venue — has produced an attestation for that exact commit. A human reviews
-and merges it. Nobody ever commits directly to `testing` or `main`.
+Three branches, and code only ever moves rightward. Changes land on `dev`
+behind a review and fast tests; `testing` receives no human commits at
+all, only automatic promotions from green builds; `main` is reachable only
+through a promotion request that a person merges.
 
-Why go to this trouble instead of just merging to `main` when a feature's
-done? Because in a system that moves real money, the cost of *finding out
-something's broken after it's live* is not "we'll patch it later" — it
-can be an actual loss. The three-stage pipeline exists to catch problems
-at increasingly expensive-to-ignore checkpoints, each one cheaper to fail
-at than the next. This is the same instinct as a staging environment in
-any serious software shop, just made structurally impossible to skip
-rather than merely encouraged.
+The gate onto `main` is the one that isn't generic software hygiene. It
+cannot be opened by a passing test suite. It requires a **paper-soak** —
+the exact `testing` build, running for hours against a live demo venue,
+producing an attestation tied to that specific commit. Tests prove the
+code does what its author expected. A soak is the only thing that can say
+*this build survived contact with a real venue's timing, its rejections,
+and its silences.* Chapter 20 is where that distinction gets its proper
+treatment; the point here is that qkt treats it as a release gate rather
+than as reassurance.
 
-The same discipline shows up in how a feature gets *built*, not just
-released. Before code gets written, there's a **design spec** — a
-document that lays out what's being built and why, including the
-alternatives that were considered and rejected. Then an **implementation
-plan** breaking the work into small, ordered steps, each ending in its
-own commit. Only then does code get written. And once a phase ships, it
-gets a **changelog** — not "what we built," which you can get from the
-diff, but "here's how you actually use it," with worked examples.
+That is also why the pipeline is one-way. In a system that moves real
+money, finding out something is broken after it is live is not "we'll
+patch it later" — it is a loss that has already happened, and a branch you
+can only move forward through is a structure where skipping the check is
+impossible rather than merely discouraged.
 
 This is worth naming explicitly, because it's the same instinct that
 makes a *trading system itself* trustworthy, just applied one level up,

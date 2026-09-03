@@ -30,6 +30,34 @@ them are true at once.
 
 Start with the vocabulary, because the states are not the obvious ones.
 
+```kotlin
+enum class OrderState {
+    /** Created locally; not yet submitted. */
+    CREATED,
+
+    /** Engine-managed parent waiting for a trigger condition before submission. */
+    PENDING,
+
+    /** Submitted to the broker; awaiting acknowledgement. */
+    SUBMITTED,
+
+    /** Acknowledged and active on the venue, awaiting fill. */
+    WORKING,
+
+    /** Some quantity has filled; the rest is still working. */
+    PARTIALLY_FILLED,
+
+    /** Fully filled. Terminal. */
+    FILLED,
+
+    /** Cancelled by strategy, engine, or venue. Terminal. */
+    CANCELLED,
+
+    /** Refused by the venue. Terminal. */
+    REJECTED,
+}
+```
+
 ![Order states: created, submitted, working, partly filled, filled, with pending as an engine-held branch and cancelled or rejected as terminal](/diagrams/chapter-18/where-an-order-can-be.png)
 
 *Figure 18.1 — every state an order can occupy. The interesting one is Pending, which is not on the path to the venue at all.*
@@ -106,12 +134,20 @@ order sitting there because its partner failed. There is no one-legged
 window because there is never a moment when only one leg was *supposed*
 to exist.
 
-The second decision is subtler. When one leg fills, the cancel for the
-other cannot always be sent immediately: if the sibling has been
-dispatched but not yet acknowledged, the venue does not have a ticket for
-it yet, and a cancel against an unacknowledged order is a silent no-op.
-So the cancellation is *deferred* until that acknowledgement arrives. A
-cancel that quietly does nothing is worse than one that waits.
+The second decision is subtler, and it is worth taking slowly.
+
+When one leg fills, the other must be cancelled. To cancel an order you
+have to name it, and the name the venue understands is the ticket *it*
+assigned — which arrives with the acknowledgement.
+
+So there is a window where the sibling has been sent but not yet
+acknowledged. In that window qkt has no venue ticket for it. A cancel sent
+now names nothing, and the venue discards it silently — no error, no
+effect, and an order still resting that everyone believes is gone.
+
+The cancellation is therefore *deferred* until the acknowledgement lands,
+and fires the moment it does. A cancel that quietly does nothing is worse
+than one that waits.
 
 And the trigger for all this is the **first partial fill**, not the final
 one. The moment the venue commits any volume to one leg, the other is
@@ -186,7 +222,7 @@ netting fill has orphaned — a resting stop whose position no longer exists
 would otherwise eventually fire as a naked entry in the opposite
 direction, with no protection of its own.
 
-## What this bought, and what it cost
+## The state it takes to keep a bracket honest
 
 What it bought is that a strategy writes one bracket and gets one bracket's
 worth of behaviour, on venues that support none of it, with every window

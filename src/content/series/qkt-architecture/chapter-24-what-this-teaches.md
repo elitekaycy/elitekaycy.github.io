@@ -24,6 +24,36 @@ That is the first general lesson, and it is not obvious at the start: in a
 trading system, correctness work vastly outweighs strategy work, and the
 ratio is not a sign that something has gone wrong. It is the job.
 
+## What the money changes
+
+It is worth naming what actually makes this domain different, because it
+is not complexity — plenty of software is more complex.
+
+It is that **the feedback is delayed, noisy, and expensive**. A web service
+with a bug produces errors immediately. A trading system with a bug
+produces *trades*, which look exactly like the trades it is supposed to
+produce, and the only signal that anything is wrong is a number that is
+slightly off — weeks later, mixed in with the natural variance of a
+strategy that loses money regularly on purpose.
+
+That single property explains almost every decision in this book. It is why
+the system refuses rather than proceeds. Why it re-derives rather than
+increments. Why it fails closed on ambiguity. Why it keeps journals it
+mostly never reads. Why "compiles" is made to mean something. In a domain
+where you cannot rely on noticing your mistakes, the design has to
+compensate by making certain mistakes structurally impossible and the rest
+loudly announced.
+
+That is the frame for everything that follows. Each lesson below is a
+consequence of it, not an independent piece of advice.
+
+It also explains what the whole thing costs. Every chapter ended with a
+price: an order of magnitude of backtest speed, a language that refuses
+half-finished ideas, startup that will not start, a ledger that recomputes
+what it could have incremented. None of it is free, and for a system with
+faster feedback, most of it would be over-engineering. The bill only makes
+sense against a failure mode that hides.
+
 ## The idea that kept arriving
 
 If one thread runs through the whole book, it is this.
@@ -123,6 +153,24 @@ a capability it can only approximate. A journal that records that it
 dropped events. A chapter of this book ending with what its subject does
 not do.
 
+It is worth collecting those endings, because read together they say
+something the individual chapters cannot. A rule reading the bid/ask spread
+never fires on data built from bars, and reports no trades rather than
+"untestable." An expiring order is cancelled on the next tick, so a quiet
+market cancels it late. A trailing stop resumes from the last high-water
+mark that reached disk, losing whatever the price did during an outage.
+Where several strategies share one account, ownership of a venue position
+can be genuinely undecidable. The operator tooling lists one venue's
+profiles and not the others'. Latency is measured but not exposed where a
+dashboard could scrape it. And the performance claims throughout rest on
+profiling nobody else can re-run, because there is no benchmark suite.
+
+None of those are resolved by this chapter, and listing them is not an
+apology. It is the point: **that list is the most honest description of the
+system available**, more useful than any of the chapters' successes,
+because it is the part a reader would otherwise have to discover on their
+own — at their own cost, in their own account.
+
 The general lesson: **a system that documents its limits is more trustworthy
 than one that appears to have none** — and the second kind does not exist,
 only the kind that hasn't told you.
@@ -146,33 +194,6 @@ it is not optional, because markets change.
 The general lesson applies well beyond trading: **properties that must hold
 everywhere have to be designed in from the first line**, because they
 cannot be retrofitted onto a system that has been assuming otherwise.
-
-## What the money changes
-
-It is worth naming what actually makes this domain different, because it
-is not complexity — plenty of software is more complex.
-
-It is that **the feedback is delayed, noisy, and expensive**. A web service
-with a bug produces errors immediately. A trading system with a bug
-produces *trades*, which look exactly like the trades it is supposed to
-produce, and the only signal that anything is wrong is a number that is
-slightly off — weeks later, mixed in with the natural variance of a
-strategy that loses money regularly on purpose.
-
-That single property explains almost every decision in this book. It is why
-the system refuses rather than proceeds. Why it re-derives rather than
-increments. Why it fails closed on ambiguity. Why it keeps journals it
-mostly never reads. Why "compiles" is made to mean something. In a domain
-where you cannot rely on noticing your mistakes, the design has to
-compensate by making certain mistakes structurally impossible and the rest
-loudly announced.
-
-And it explains what the whole thing costs. Every chapter ended with a
-price: an order of magnitude of backtest speed, a language that refuses
-half-finished ideas, startup that will not start, a ledger that recomputes
-what it could have incremented. None of it is free, and for a system with
-faster feedback, most of it would be over-engineering. The bill only makes
-sense against a failure mode that hides.
 
 ## What to take
 

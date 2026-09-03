@@ -50,8 +50,14 @@ pending, the intention should not sit behind a thousand price updates. An
 operator asking a wedged session to stop should not have to wait for the
 backlog to clear.
 
-The tick queue is bounded, at ten thousand, and what it does on overflow
-is worth pausing on: **it drops the oldest tick, not the newest.** That is
+The tick queue is bounded, at ten thousand. It only ever fills if the
+engine is consuming slower than the market is producing — a burst around a
+news release, a subscriber that got slow, a long garbage-collection pause.
+At a few thousand ticks a second, ten thousand is a couple of seconds of
+headroom before a decision has to be made.
+
+What it does when that headroom runs out is worth pausing on: **it drops
+the oldest tick, not the newest.** That is
 the opposite of what a queue usually does, and it is right here. If the
 engine has fallen so far behind that ten thousand ticks are waiting, the
 oldest ones describe a market that no longer exists. A trading decision
@@ -159,7 +165,7 @@ The command exits non-zero when anything is unhealthy, which is what makes
 it usable from a cron job or a monitor rather than only by a human reading
 output. The same shape as `qkt reconcile`: the exit code is the alert.
 
-## What this bought, and what it cost
+## What one thread is worth
 
 What the single-consumer design bought is that every guarantee from the
 first half of this book survives contact with concurrency. One order of

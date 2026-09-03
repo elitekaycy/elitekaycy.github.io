@@ -16,7 +16,7 @@ So something else has to watch — a supervisor that sits outside every strategy
 
 The risk engine actually runs two separate checks, and it's worth being precise about why they're separate rather than one unified thing.
 
-The first kind of check looks at **one proposed order** and asks whether it, by itself, is reasonable — is this position too large, does this order's notional value exceed a sane cap for the account. This is a `RiskRule`: stateless with respect to the check itself, evaluated synchronously the instant an order is about to be submitted, and it either approves or rejects that one order.
+The first kind of check looks at **one proposed order** and asks whether it, by itself, is reasonable — is this position too large, does this order's **notional value** — the cash value of what it controls, price times quantity times contract size, rather than the smaller margin actually posted — exceed a sane cap for the account. This is a `RiskRule`: stateless with respect to the check itself, evaluated synchronously the instant an order is about to be submitted, and it either approves or rejects that one order.
 
 ```kotlin
 interface RiskRule {

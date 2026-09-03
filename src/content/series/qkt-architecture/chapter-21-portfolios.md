@@ -53,6 +53,13 @@ RULES
     RUN meanrev
 ```
 
+`adx` is the Average Directional Index — a standard measure of how
+*strongly* a market is trending, regardless of direction. It runs roughly
+0 to 100, and a reading above about 25 is the conventional line between
+"drifting" and "genuinely trending." That threshold is a convention, not
+a law, which is exactly why it sits in the strategy file where it can be
+changed rather than buried in the engine.
+
 Read the `RULES` block and notice what it does *not* say. Both children
 simply run. There is no condition switching one off. The regime is not
 deciding *whether* each strategy trades — it is deciding **how much of the
@@ -173,7 +180,7 @@ on closed bars. For a decision about market character measured over
 fourteen hourly bars, that is correct, and it means the allocation cannot
 flicker between two ticks.
 
-## What this bought, and what it cost
+## One book, shared
 
 What it bought is a book that adapts without anyone editing a file: two
 strategies, both running, with the balance between them following measured

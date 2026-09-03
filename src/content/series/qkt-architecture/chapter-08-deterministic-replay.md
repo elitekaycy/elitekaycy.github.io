@@ -1,6 +1,6 @@
 ---
 title: "Deterministic Replay"
-excerpt: "Suppose someone hands you a change that touches twelve lines deep inside the order-fill handler — the same handler the last three chapters spent time inside. How do you know, for certain, that every..."
+excerpt: "Part II built the things that have to be *correct*: one true position, a supervisor that can say no, arithmetic that does not drift. This part is about something different — how you ever come to..."
 date: 2026-07-20
 order: 8
 draft: false
@@ -8,7 +8,9 @@ draft: false
 
 ## The question a diff can't answer
 
-Suppose someone hands you a change that touches twelve lines deep inside the order-fill handler — the same handler the last three chapters spent time inside. How do you know, for certain, that every strategy this engine has ever run still behaves exactly the way it used to? Not "probably fine," not "I read it carefully and it looks right" — certain.
+Part II built the things that have to be *correct*: one true position, a supervisor that can say no, arithmetic that does not drift. This part is about something different — how you ever come to *believe* any of it works.
+
+So suppose someone hands you a change that touches twelve lines deep inside the order-fill handler — the same handler the last three chapters spent time inside. How do you know, for certain, that every strategy this engine has ever run still behaves exactly the way it used to? Not "probably fine," not "I read it carefully and it looks right" — certain.
 
 You don't get there by reading the diff. Trading logic accumulates too much state and touches too many branches for a human to trace every path a twelve-line change might affect. The only answer that actually holds up is mechanical: take a long stretch of real historical market data, run it through the engine before the change, run the identical data through the engine after the change, and compare the two outputs — every fill price, every position, every dollar of realized P&L — down to the byte. If they match exactly, the change didn't alter trading behavior, full stop, no matter how deep it reached. If even one number differs, something changed, and now you have a very specific, very small question to answer: why did *this* number move?
 

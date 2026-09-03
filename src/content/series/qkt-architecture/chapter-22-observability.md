@@ -184,7 +184,7 @@ The manifest also embeds hashes of the exact config and strategy files
 that were bundled, which ties the evidence to a provable version — the
 same instinct as Chapter 20's attestation, applied to a support ticket.
 
-## What this bought, and what it cost
+## Paying for the evidence
 
 What it bought is that "what exactly happened, in order" has an answer,
 that a wedged session can be distinguished from a quiet one, that a disk

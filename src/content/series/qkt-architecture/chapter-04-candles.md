@@ -274,7 +274,7 @@ replay says it went open, low, high, close, calmly, four times. The four
 numbers a bar records genuinely do not contain the sequence that produced
 them.
 
-## What this bought, and what it cost
+## Four numbers, and what they threw away
 
 A candle builder turns out to be a `TickEvent` subscriber that remembers
 a little more than most: instead of reacting to each tick alone, it holds

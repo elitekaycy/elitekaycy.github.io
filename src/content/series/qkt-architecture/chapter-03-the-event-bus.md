@@ -255,7 +255,7 @@ pipeline on whatever thread happened to produce it.
 
 *Figure 3.3 — an event produced on the wrong thread waits in a queue; only the engine thread ever stamps and delivers. One thread, one order, even when the world is concurrent.*
 
-## What this bought, and what it cost
+## One order, and what it costs to keep it
 
 What the bus bought is straightforward: the engine announces that a tick
 arrived and never learns who cared. New subscribers cost the publisher

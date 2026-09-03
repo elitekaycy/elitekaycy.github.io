@@ -34,16 +34,39 @@ re-priced for unrealized P&L. That is the loop. The optimisations are all
 in *how* those four things are written, and they fall into a small number
 of repeated patterns.
 
-**Do not allocate to iterate.** Dispatching an event to its subscribers is
-the single most-travelled line in the engine, and it uses an index loop
-rather than a for-each, because a for-each allocates an iterator — once
-per published event, forever.
+Both of the first two are visible in about eight lines of the event bus:
 
-**Do not build what you will not read.** The trace log line in that same
-dispatch is wrapped in a check for whether trace logging is on. Unguarded,
-the two `Long` arguments box and a varargs array allocates on every
-publish *even when the log level means the line is discarded*. The guard
-skips all of it.
+```kotlin
+// Guarded: publish is the engine's hottest line. Unguarded, the two Long args box and a
+// vararg Object[] allocates on every publish even when trace is off; the guard skips all of
+// that. Output is unchanged when trace is enabled.
+if (log.isTraceEnabled) {
+    log.trace("publish {} seq={} ts={}", stamped::class.simpleName, stamped.sequenceId, stamped.timestamp)
+}
+
+// Index loop over the handler list (the single most-traversed line in the engine) avoids
+// allocating an Iterator per published event.
+val handlers = subscribers[stamped.javaClass].orEmpty()
+for (i in handlers.indices) {
+    handlers[i](stamped)
+}
+```
+
+**Do not build what you will not read.** That `if` looks pointless — the
+logging framework would discard the line anyway. But *evaluating the
+arguments* happens first, regardless: the two `Long`s get wrapped into
+objects (Java cannot put a primitive in an `Object[]`), and a varargs
+array is allocated to carry them. Three allocations per published event,
+thrown away immediately, in production where trace is always off. The
+guard skips the whole thing.
+
+**Do not allocate to iterate.** `for (h in handlers)` would create an
+iterator object on every publish. `for (i in handlers.indices)` walks the
+same list with an integer. Identical behaviour, one fewer object per
+event, on the line that runs more than any other in the system.
+
+Neither is clever. Both are the sort of thing that is invisible at one
+call and dominant at ten million.
 
 **Reuse the scratch space.** The per-tick order sweep fills reusable lists
 rather than new ones, because clearing a list keeps its capacity — so
@@ -154,7 +177,7 @@ An average would hide the tail entirely, and the tail is the part that
 matters — a mean of twelve microseconds is compatible with a hundred
 occasional excursions that each missed a bar close.
 
-## What this bought, and what it cost
+## Cheap to run, harder to read
 
 What it bought is an engine whose per-tick cost is roughly flat as
 strategies and symbols are added, whose steady-state allocation on the hot

@@ -48,10 +48,13 @@ account statement arrives.
 
 *Figure 12.1 — the same rule, fired at two moments. The left one reads a real number computed from not enough data. Nothing distinguishes it from the right one except how much history had accumulated.*
 
-So: how many bars? For a single average, easy — the period. For
-`MACD(12, 26, 9)`, the answer is thirty-four, not the twenty-six the
-largest number suggests, because the signal line is an average *of* the
-MACD line and cannot start until that line exists. For an average of an
+So: how many bars? For a single average, easy — the period: an
+**exponential moving average** over twenty-one bars needs twenty-one bars.
+For `MACD(12, 26, 9)` — a standard momentum indicator built from a fast
+average, a slow one, and a third average smoothing the gap between them —
+the answer is thirty-four, not the twenty-six the largest number
+suggests, because the signal line is an average *of* the MACD line and
+cannot start until that line exists. For an average of an
 average — `ema(ema(close, 9), 21)` — the requirements add rather than
 max out: thirty bars, not twenty-one. For a rule comparing a one-minute
 stream against a five-minute one, the answer is two different numbers,

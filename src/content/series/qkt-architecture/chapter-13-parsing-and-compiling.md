@@ -47,7 +47,10 @@ A **parser** then turns that flat stream of tokens into a tree — the
 structure the file was always describing. `a AND b > c` becomes an `AND`
 whose right-hand side is a comparison, because the parser knows comparison
 binds tighter than `AND`. This is standard, and qkt's is a plain
-hand-written recursive-descent parser rather than anything generated.
+hand-written *recursive-descent* parser rather than anything generated —
+meaning one small function per grammar rule, each calling the functions
+for the pieces it is made of, so the shape of the code mirrors the shape
+of the language.
 
 One decision here is not standard, and it shows up the first time you make
 two mistakes at once. **The parser collects errors instead of throwing on
