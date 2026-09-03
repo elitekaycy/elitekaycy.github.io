@@ -1,8 +1,8 @@
 ---
 title: "What Building qkt Teaches About Trading Systems in General"
 excerpt: "Chapter 1 opened with a claim that trading is a loop: watch a price, decide something, maybe act, see what happened, repeat. Twenty-three chapters later that is still true, and it is worth admitting..."
-date: 2026-11-09
-order: 24
+date: 2026-11-16
+order: 25
 draft: false
 ---
 
@@ -58,9 +58,9 @@ sense against a failure mode that hides.
 
 If one thread runs through the whole book, it is this.
 
-![The same principle — absence is a value, not zero — appearing independently in six different chapters](/diagrams/chapter-24/one-idea-in-six-places.png)
+![The same principle — absence is a value, not zero — appearing independently in six different chapters](/diagrams/chapter-25/one-idea-in-six-places.png)
 
-*Figure 24.1 — six components, six unrelated problems, one answer.*
+*Figure 25.1 — six components, six unrelated problems, one answer.*
 
 A stop-loss that is `null` because the venue has no such concept, versus
 one that is `0` because the position is genuinely unprotected. An indicator

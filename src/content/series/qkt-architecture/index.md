@@ -44,7 +44,8 @@ parts:
       - chapter-23-performance
   - title: "Close"
     chapters:
-      - chapter-24-what-this-teaches
+      - chapter-24-one-strategy-end-to-end
+      - chapter-25-what-this-teaches
 ---
 
 A chapter-by-chapter walkthrough of trading systems in general, and `qkt` — an

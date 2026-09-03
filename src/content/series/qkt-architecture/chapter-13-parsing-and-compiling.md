@@ -82,9 +82,23 @@ tick, and never trades, with nothing anywhere reporting a problem.
 
 That is the worst failure shape in this entire book — not a crash, not a
 wrong number, but a silent nothing that looks exactly like a strategy
-whose conditions simply have not been met yet. One `require`-style check
-at the end of parsing is what stands between a typo and a week of
-wondering why the account never moved.
+whose conditions simply have not been met yet.
+
+Here is the check doing its job, on a real file with its blocks in the
+wrong order:
+
+```
+$ qkt parse momentum_sweep.qkt
+momentum_sweep.qkt:6:1 — unexpected 'SYMBOLS' after the last recognized block
+  — everything from here on would be silently ignored
+```
+
+Read the second half of that message again: *everything from here on would
+be silently ignored.* The error does not merely say the file is wrong. It
+says what the alternative would have been, which is the difference between
+a diagnostic that helps and one that only complains. One `require`-style
+check at the end of parsing is what stands between a misplaced block and a
+week of wondering why the account never moved.
 
 ## Rewriting the tree before checking it
 
