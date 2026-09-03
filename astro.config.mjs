@@ -9,7 +9,7 @@ import rehypeTerms from './src/lib/rehype-terms.mjs';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://elitekaycy.github.io',
+  site: 'https://elitekaycy.com',
 
   vite: {
     plugins: [tailwindcss()],

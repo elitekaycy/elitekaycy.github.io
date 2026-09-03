@@ -1,4 +1,4 @@
-# elitekaycy.github.io
+# elitekaycy.com
 
 Personal site — about, blog, and a home for long-form series (multi-chapter
 write-ups with a floating table of contents and next/prev navigation).
