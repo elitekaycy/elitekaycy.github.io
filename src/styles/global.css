@@ -546,6 +546,18 @@ body {
 .prose .gain { color: var(--ink-gain); font-weight: 500; }
 .prose .loss { color: var(--ink-halt); font-weight: 500; }
 
+/* A term being defined is not the same job as a clause being emphasised, and
+   the series does both with bold. Vocabulary gets a quiet underline so a
+   reader learning the domain can find it while skimming; the sentence being
+   emphasised keeps plain bold and stays the louder of the two. No hue —
+   there can be a dozen terms in a chapter, which is far too many for colour
+   to still mean anything. */
+.prose .term {
+  font-weight: 600;
+  border-bottom: 1px dashed var(--border-strong);
+  padding-bottom: 0.05em;
+}
+
 /* Callouts. Four kinds, each borrowing a colour the figures already use, so a
    warning in the prose is the same amber as a warning in a diagram. Left rule
    plus a low-opacity wash rather than a saturated fill — a solid block reads

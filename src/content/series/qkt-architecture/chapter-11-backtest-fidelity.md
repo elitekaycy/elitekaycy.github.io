@@ -189,15 +189,19 @@ have to remember which execution assumptions produced it, because the
 assumptions are stapled to the ratio.
 
 And one limit deserves naming directly, because it is the quietest failure in
-this chapter. A strategy whose rules read the **spread** — the gap between
-what buyers are bidding and what sellers are asking — has nothing to read on
-a feed synthesized from bars, because bars don't carry both sides of the
-market. Those rules don't error. They evaluate as undefined and simply never
-fire, forever, and a backtest of a spread-aware strategy on bar data will
-report that it took no trades rather than that it could not be tested. qkt
-detects the combination and warns, which is the best available answer, but
-the warning is the fix — there is no way to reconstruct a bid/ask spread from
-four mid prices.
+this chapter.
+
+> [!DANGER]
+> A strategy whose rules read the **spread** — the gap between what buyers
+> are bidding and what sellers are asking — has nothing to read on a feed
+> synthesised from bars, because bars do not carry both sides of the market.
+> Those rules do not error. They evaluate as undefined and never fire, so a
+> backtest of a spread-aware strategy on bar data reports that it took no
+> trades rather than that it could not be tested.
+
+qkt detects the combination and warns, which is the best available answer,
+but the warning *is* the fix — there is no way to reconstruct a bid/ask
+spread from four mid prices.
 
 ## What this bought, and what it cost
 

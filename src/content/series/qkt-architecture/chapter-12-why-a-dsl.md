@@ -187,9 +187,14 @@ has no extension point, on purpose, because an extension point is exactly
 the hole through which un-analysable code would enter.
 
 **Some things must be declared that could in principle be inferred.**
-Warmup derivation covers indicators thoroughly, but a rule reaching back
-by index — `stream.close[N]` — is not yet walked for its own lookback, so
-that case wants an explicit `WARMUP N BARS`. The documentation says so
+
+> [!WARNING]
+> Warmup derivation covers indicators thoroughly, but a rule reaching back by
+> index — `stream.close[N]` — is not yet walked for its own lookback. That
+> case needs an explicit `WARMUP N BARS`, or the rule can fire before the
+> history it reaches into exists.
+
+The documentation says so
 plainly rather than letting the gap sit undiscovered, which is the right
 call, but it is still a place where the reader has to know something the
 compiler could have worked out.

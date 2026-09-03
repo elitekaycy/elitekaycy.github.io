@@ -125,8 +125,12 @@ STRATEGIES
 ```
 
 Exit zero when everything is healthy, non-zero with the reasons on stderr
-when it is not — which is what makes it usable from cron rather than only
-by a person reading a screen.
+when it is not.
+
+> [!TIP]
+> Because the exit code carries the verdict, the check composes with
+> ordinary tooling — a cron entry that pages on a non-zero exit turns the
+> whole health surface into a monitor without any integration work.
 
 ## Alerts that behave when the world misbehaves
 

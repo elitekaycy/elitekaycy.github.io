@@ -172,8 +172,11 @@ sits half-complete forever.
 
 qkt lets a group carry a timeout. With one set, a window that falls too
 far behind is dropped — no rule fires for it, and the memory is released.
-With no timeout set, the partial window is kept indefinitely, which is
-correct when both streams reliably print and a slow leak when they don't.
+
+> [!WARNING]
+> With no timeout set, a partial window is kept indefinitely. That is correct
+> when both streams reliably print, and a slow memory leak when one of them
+> stops.
 The source says as much in plain terms rather than pretending the
 unbounded case is safe.
 
