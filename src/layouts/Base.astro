@@ -43,6 +43,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         document.documentElement.setAttribute('data-theme', stored);
       }
     </script>
+
+    <!-- Cloudflare Web Analytics -->
+    <script
+      is:inline
+      type="module"
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "facc02bbdb424f08b5a3aa051461ba18"}'
+    ></script>
+    <!-- End Cloudflare Web Analytics -->
   </head>
   <body class="min-h-screen bg-bg font-sans text-fg antialiased">
     <a href="#main" class="skip-link">Skip to content</a>
