@@ -10,26 +10,31 @@ const recent = feed.slice(0, 8);
 const platform = [
   {
     name: 'tryqkt.com',
+    logo: '/logos/qkt.svg',
     href: 'https://tryqkt.com',
     blurb: 'The qkt platform: what each piece does and how they fit together.',
   },
   {
     name: 'docs.tryqkt.com',
+    logo: '/logos/qkt.svg',
     href: 'https://docs.tryqkt.com',
     blurb: 'qkt documentation: the strategy language, backtesting, going live, and the CLI.',
   },
   {
     name: 'labs.tryqkt.com',
+    logo: '/logos/qkt-labs.svg',
     href: 'https://labs.tryqkt.com',
     blurb: 'qkt Labs (beta): a marketplace for qkt strategies, each listed with the evidence the system generates.',
   },
   {
     name: 'mt5.tryqkt.com',
+    logo: '/logos/mt5-gateway.svg',
     href: 'https://mt5.tryqkt.com',
     blurb: 'mt5-gateway docs: run MetaTrader 5 headless in Docker and trade it over REST.',
   },
   {
     name: 'venuegw.tryqkt.com',
+    logo: '/logos/qkt-venue-gateway.svg',
     href: 'https://venuegw.tryqkt.com',
     blurb: 'qkt-venue-gateway docs: one protocol for futures, perpetuals, options and spot venues.',
   },
@@ -38,21 +43,25 @@ const platform = [
 const projects = [
   {
     name: 'qkt',
+    logo: '/logos/qkt.svg',
     href: 'https://github.com/elitekaycy/qkt',
     blurb: 'Event-driven trading engine in Kotlin — SQL-like strategy DSL, deterministic backtests, same code live.',
   },
   {
     name: 'qkt-insights',
+    logo: '/logos/qkt-insights.svg',
     href: 'https://github.com/elitekaycy/qkt-insights',
     blurb: 'Observability dashboard for qkt: signals, orders, fills and equity from the live event stream.',
   },
   {
     name: 'mt5-gateway',
+    logo: '/logos/mt5-gateway.svg',
     href: 'https://github.com/elitekaycy/mt5-gateway',
     blurb: 'Headless REST API for MetaTrader 5 — the real terminal under Wine in Docker, no GUI.',
   },
   {
     name: 'qkt-venue-gateway',
+    logo: '/logos/qkt-venue-gateway.svg',
     href: 'https://github.com/elitekaycy/qkt-venue-gateway',
     blurb: 'VGP v1 gateway between qkt and a venue: journaled, idempotent orders and a kill switch outside qkt.',
   },
@@ -172,6 +181,7 @@ const projects = [
               class="group flex h-full flex-col rounded-xl border border-border p-5 transition-colors hover:border-border-strong hover:bg-surface"
             >
               <span class="flex items-center gap-1.5 font-mono text-sm font-semibold text-fg">
+                {site.logo && <img src={site.logo} alt="" height="22" class="h-[22px] w-auto shrink-0" />}
                 {site.name}
                 <span
                   aria-hidden="true"
@@ -207,6 +217,7 @@ const projects = [
               class="group flex h-full flex-col rounded-xl border border-border p-5 transition-colors hover:border-border-strong hover:bg-surface"
             >
               <span class="flex items-center gap-1.5 font-mono text-sm font-semibold text-fg">
+                {project.logo && <img src={project.logo} alt="" height="22" class="h-[22px] w-auto shrink-0" />}
                 {project.name}
                 <span
                   aria-hidden="true"

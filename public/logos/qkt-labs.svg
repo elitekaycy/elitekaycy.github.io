@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 200" role="img" aria-label="qkt Labs">
+  <title>qkt Labs</title>
+  <style>
+    .bracket { stroke: #7c3aed; }
+    .letter  { stroke: #0d1117; }
+    .rise    { stroke: #16a34a; }
+    @media (prefers-color-scheme: dark) {
+      .bracket { stroke: #a78bfa; }
+      .letter  { stroke: #e5e7eb; }
+      .rise    { stroke: #4ade80; }
+    }
+  </style>
+  <g fill="none" stroke-width="14">
+    <g class="bracket" stroke-linejoin="miter">
+      <path d="M56 50H34v100h22"/>
+      <path d="M204 50h22v100h-22"/>
+    </g>
+    <g class="letter" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M77 50v100"/>
+      <path d="M122 50L77 100L112 150"/>
+    </g>
+    <g class="rise" stroke-linecap="round" stroke-linejoin="round" stroke-width="12">
+      <path d="M132 144L152 110L168 125L197 88"/>
+      <path d="M175 86H199V110"/>
+    </g>
+  </g>
+</svg>
