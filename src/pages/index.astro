@@ -6,6 +6,35 @@ import { getFeed } from '../lib/content';
 const feed = await getFeed();
 const recent = feed.slice(0, 8);
 
+// The live qkt sites, in the order a visitor would want them.
+const platform = [
+  {
+    name: 'tryqkt.com',
+    href: 'https://tryqkt.com',
+    blurb: 'The qkt platform: what each piece does and how they fit together.',
+  },
+  {
+    name: 'docs.tryqkt.com',
+    href: 'https://docs.tryqkt.com',
+    blurb: 'qkt documentation: the strategy language, backtesting, going live, and the CLI.',
+  },
+  {
+    name: 'labs.tryqkt.com',
+    href: 'https://labs.tryqkt.com',
+    blurb: 'qkt Labs (beta): a marketplace for qkt strategies, each listed with the evidence the system generates.',
+  },
+  {
+    name: 'mt5.tryqkt.com',
+    href: 'https://mt5.tryqkt.com',
+    blurb: 'mt5-gateway docs: run MetaTrader 5 headless in Docker and trade it over REST.',
+  },
+  {
+    name: 'venuegw.tryqkt.com',
+    href: 'https://venuegw.tryqkt.com',
+    blurb: 'qkt-venue-gateway docs: one protocol for futures, perpetuals, options and spot venues.',
+  },
+];
+
 const projects = [
   {
     name: 'qkt',
@@ -15,7 +44,7 @@ const projects = [
   {
     name: 'qkt-insights',
     href: 'https://github.com/elitekaycy/qkt-insights',
-    blurb: 'Analysis and reporting layer over qkt runs.',
+    blurb: 'Observability dashboard for qkt: signals, orders, fills and equity from the live event stream.',
   },
   {
     name: 'mt5-gateway',
@@ -23,9 +52,24 @@ const projects = [
     blurb: 'Headless REST API for MetaTrader 5 — the real terminal under Wine in Docker, no GUI.',
   },
   {
+    name: 'qkt-venue-gateway',
+    href: 'https://github.com/elitekaycy/qkt-venue-gateway',
+    blurb: 'VGP v1 gateway between qkt and a venue: journaled, idempotent orders and a kill switch outside qkt.',
+  },
+  {
     name: 'qkt-guardrails',
     href: 'https://github.com/elitekaycy/qkt-guardrails',
     blurb: 'Engine-independent equity watchdog for prop-firm and live MT5 accounts.',
+  },
+  {
+    name: 'qkt-backtester',
+    href: 'https://github.com/elitekaycy/qkt-backtester',
+    blurb: 'Browser workspace for qkt: write a strategy, run it, and follow every trade on the chart.',
+  },
+  {
+    name: 'qkt-data-hub',
+    href: 'https://github.com/elitekaycy/qkt-data-hub',
+    blurb: 'Point-in-time fact store for trading systems: one record format, live tail and historical snapshot.',
   },
 ];
 ---
@@ -64,6 +108,11 @@ const projects = [
         target="_blank"
         rel="noopener noreferrer"
         class="inline-link font-mono text-[0.95em]">mt5-gateway</a
+      >, <a
+        href="https://github.com/elitekaycy/qkt-venue-gateway"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-link font-mono text-[0.95em]">qkt-venue-gateway</a
       >, and <a
         href="https://github.com/elitekaycy/qkt-guardrails"
         target="_blank"
@@ -103,11 +152,49 @@ const projects = [
   </section>
 
   <section
+    aria-labelledby="platform-heading"
+    class="mx-auto max-w-3xl border-t border-border px-6 py-14 sm:px-8"
+  >
+    <h2 id="platform-heading" class="text-lg font-semibold tracking-tight">
+      The qkt platform
+    </h2>
+    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+      qkt is an open-source trading engine and the tools around it. These are the live sites.
+    </p>
+    <ul class="mt-6 grid gap-3 sm:grid-cols-2">
+      {
+        platform.map((site) => (
+          <li>
+            <a
+              href={site.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="group flex h-full flex-col rounded-xl border border-border p-5 transition-colors hover:border-border-strong hover:bg-surface"
+            >
+              <span class="flex items-center gap-1.5 font-mono text-sm font-semibold text-fg">
+                {site.name}
+                <span
+                  aria-hidden="true"
+                  class="text-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent"
+                >
+                  ↗
+                </span>
+                <span class="sr-only">(opens in a new tab)</span>
+              </span>
+              <span class="mt-2 text-sm leading-relaxed text-muted">{site.blurb}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section
     aria-labelledby="projects-heading"
     class="mx-auto max-w-3xl border-t border-border px-6 py-14 sm:px-8"
   >
     <h2 id="projects-heading" class="text-lg font-semibold tracking-tight">
-      What I'm building
+      Open source
     </h2>
     <ul class="mt-6 grid gap-3 sm:grid-cols-2">
       {
