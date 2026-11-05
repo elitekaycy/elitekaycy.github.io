@@ -1,4 +1,7 @@
 ---
+import HeartIcon from './HeartIcon.astro';
+import { SPONSOR_URL } from '../lib/sponsor';
+
 const year = new Date().getFullYear();
 
 const links = [
@@ -9,6 +12,34 @@ const links = [
 ---
 
 <footer class="mt-8 border-t border-border">
+  <section aria-labelledby="sponsor-heading" class="mx-auto max-w-3xl px-6 pt-12 sm:px-8">
+    <div
+      class="flex flex-col gap-6 rounded-xl border border-border bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
+    >
+      <div class="max-w-md">
+        <h2 id="sponsor-heading" class="flex items-start gap-2 text-base font-semibold tracking-tight text-fg">
+          <HeartIcon class="mt-[0.2rem] size-[1.05rem]" />
+          I build qkt and my other tools in the open.
+        </h2>
+        <p class="mt-2 text-sm leading-relaxed text-muted">
+          No VC money, no paywalls on the open-source parts. If something here saved you time,
+          sponsoring keeps it going.
+        </p>
+      </div>
+      <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+        <a
+          href={SPONSOR_URL}
+          target="_blank"
+          rel="noopener"
+          class="group inline-flex items-center gap-2 rounded-lg border border-border-strong bg-bg px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-heart hover:bg-surface-hover active:scale-[0.98]"
+        >
+          <HeartIcon class="size-4 transition-transform duration-150 group-hover:scale-110" />
+          Sponsor on GitHub<span class="sr-only"> (opens in a new tab)</span>
+        </a>
+        <p class="text-xs text-faint">Any amount, monthly or once.</p>
+      </div>
+    </div>
+  </section>
   <div
     class="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"
   >
