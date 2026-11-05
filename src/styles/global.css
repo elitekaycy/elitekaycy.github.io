@@ -21,6 +21,7 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-heart: var(--heart);
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -68,6 +69,8 @@
   --wash-note: #f8fafc;
   --mark-bg: #fff3cd;
   --mark-fg: #713f12;
+  /* Sponsor heart: a warm rose, the one non-semantic accent. #be185d on #ffffff → 6.0:1. */
+  --heart: #be185d;
   color-scheme: light;
 }
 
@@ -106,6 +109,8 @@
   --wash-note: rgb(255 255 255 / 0.04);
   --mark-bg: rgb(251 191 36 / 0.18);
   --mark-fg: #ffd876;
+  /* #f472b6 on #0a0a0b → 7.6:1. */
+  --heart: #f472b6;
   color-scheme: dark;
 }
 
@@ -133,6 +138,8 @@
     --wash-note: rgb(255 255 255 / 0.04);
     --mark-bg: rgb(251 191 36 / 0.18);
     --mark-fg: #ffd876;
+    /* #f472b6 on #0a0a0b → 7.6:1. */
+    --heart: #f472b6;
     color-scheme: dark;
   }
 }

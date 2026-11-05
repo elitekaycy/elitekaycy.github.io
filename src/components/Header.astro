@@ -1,5 +1,7 @@
 ---
 import ThemeToggle from './ThemeToggle.astro';
+import HeartIcon from './HeartIcon.astro';
+import { SPONSOR_URL } from '../lib/sponsor';
 
 const nav = [
   { href: '/', label: 'Home' },
@@ -43,6 +45,16 @@ const isActive = (href: string) =>
           </a>
         ))
       }
+      <a
+        href={SPONSOR_URL}
+        target="_blank"
+        rel="noopener"
+        aria-label="Sponsor on GitHub (opens in a new tab)"
+        class="group flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-normal text-muted transition-colors hover:bg-surface-hover hover:text-fg sm:px-3"
+      >
+        <HeartIcon class="size-[1.05rem] transition-transform duration-150 group-hover:scale-110 sm:size-4" />
+        <span class="hidden sm:inline">Sponsor</span>
+      </a>
       <ThemeToggle />
     </nav>
   </div>
